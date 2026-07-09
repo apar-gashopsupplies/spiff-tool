@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spiff Funding CSV Generator</title>
+  <meta name="description" content="Generate dealership spiff funding CSV files for incentive payments">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="xlsx.full.min.js"></script>
+  <style>*{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0a0e17;--card:rgba(255,255,255,0.04);--card-border:rgba(255,255,255,0.08);--text:#e2e8f0;--text-dim:#94a3b8;--accent:#818cf8;--accent2:#6366f1;--success:#22c55e;--warning:#f59e0b;--error:#ef4444;--radius:12px}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding:20px}
+h1{font-size:1.8rem;font-weight:700;background:linear-gradient(135deg,#818cf8,#c084fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+.subtitle{color:var(--text-dim);font-size:0.85rem;margin-bottom:24px}
+.card{background:var(--card);border:1px solid var(--card-border);border-radius:var(--radius);padding:20px;margin-bottom:16px;backdrop-filter:blur(12px)}
+.card h2{font-size:1.1rem;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card h2 .step{background:linear-gradient(135deg,var(--accent),#c084fc);color:#fff;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.8rem;font-weight:700;flex-shrink:0}
+.upload-zone{border:2px dashed var(--card-border);border-radius:var(--radius);padding:32px;text-align:center;cursor:pointer;transition:all 0.3s}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(129,140,248,0.05)}
+.upload-zone p{color:var(--text-dim);font-size:0.85rem;margin-top:8px}
+.upload-zone .icon{font-size:2rem;margin-bottom:8px}
+.upload-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.file-tag{display:inline-flex;align-items:center;gap:6px;background:rgba(129,140,248,0.1);border:1px solid rgba(129,140,248,0.2);border-radius:8px;padding:6px 12px;font-size:0.8rem;margin:4px}
+.file-tag .remove{cursor:pointer;opacity:0.6;font-size:1.1rem}
+.file-tag .remove:hover{opacity:1;color:var(--error)}
+.btn{padding:8px 18px;border:none;border-radius:8px;font-family:inherit;font-size:0.85rem;font-weight:600;cursor:pointer;transition:all 0.2s}
+.btn-primary{background:linear-gradient(135deg,var(--accent2),#7c3aed);color:#fff}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(99,102,241,0.4)}
+.btn-secondary{background:rgba(255,255,255,0.06);color:var(--text);border:1px solid var(--card-border)}
+.btn-secondary:hover{background:rgba(255,255,255,0.1)}
+.btn-success{background:linear-gradient(135deg,#16a34a,#22c55e);color:#fff}
+.btn-success:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(34,197,94,0.4)}
+.btn-sm{padding:5px 12px;font-size:0.75rem}
+.btn-danger{background:rgba(239,68,68,0.15);color:var(--error);border:1px solid rgba(239,68,68,0.2)}
+.config-row{display:flex;gap:16px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.config-row label{font-size:0.8rem;color:var(--text-dim);min-width:100px}
+select,input[type="text"],input[type="number"]{background:#1a1f2e;border:1px solid var(--card-border);color:var(--text);padding:7px 12px;border-radius:8px;font-family:inherit;font-size:0.85rem}
+select option{background:#1a1f2e;color:var(--text);padding:4px 8px}
+select:focus,input:focus{outline:none;border-color:var(--accent)}
+table{width:100%;border-collapse:collapse;font-size:0.82rem}
+th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--card-border);color:var(--text-dim);font-weight:500;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.5px}
+td{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,0.03)}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.status-badge{padding:3px 8px;border-radius:6px;font-size:0.72rem;font-weight:600}
+.status-matched{background:rgba(34,197,94,0.15);color:var(--success)}
+.status-review{background:rgba(245,158,11,0.15);color:var(--warning)}
+.status-unmatched{background:rgba(239,68,68,0.15);color:var(--error)}
+.tabs{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:7px 16px;border-radius:8px;font-size:0.82rem;cursor:pointer;background:rgba(255,255,255,0.04);border:1px solid transparent;transition:all 0.2s;font-weight:500}
+.tab.active{background:rgba(129,140,248,0.15);border-color:rgba(129,140,248,0.3);color:var(--accent)}
+.tab:hover:not(.active){background:rgba(255,255,255,0.06)}
+.tab .count{background:rgba(255,255,255,0.1);padding:1px 6px;border-radius:4px;font-size:0.7rem;margin-left:4px}
+.toast-container{position:fixed;top:20px;right:20px;z-index:1000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:12px 20px;border-radius:10px;font-size:0.82rem;backdrop-filter:blur(12px);animation:slideIn 0.3s ease;max-width:400px}
+.toast-success{background:rgba(34,197,94,0.2);border:1px solid rgba(34,197,94,0.3);color:var(--success)}
+.toast-warning{background:rgba(245,158,11,0.2);border:1px solid rgba(245,158,11,0.3);color:var(--warning)}
+.toast-error{background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.3);color:var(--error)}
+.toast-info{background:rgba(129,140,248,0.2);border:1px solid rgba(129,140,248,0.3);color:var(--accent)}
+@keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
+.preview-box{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-family:'Courier New',monospace;font-size:0.75rem;color:var(--text-dim);max-height:200px;overflow-y:auto;margin-top:8px;white-space:pre}
+.redirect-rule{display:flex;align-items:center;gap:8px;padding:10px 14px;background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:8px;margin-bottom:6px;font-size:0.82rem;flex-wrap:wrap}
+.redirect-rule .arrow{color:var(--accent);font-weight:700}
+.redirect-add{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.empty-state{text-align:center;padding:24px;color:var(--text-dim);font-size:0.85rem}
+.match-select{max-width:200px}
+.editable{background:rgba(255,255,255,0.04);border:1px solid transparent;padding:3px 6px;border-radius:4px;color:var(--text);font-family:inherit;font-size:inherit}
+.editable:focus{border-color:var(--accent);outline:none}
+.alert-bar{padding:10px 16px;border-radius:8px;font-size:0.8rem;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.alert-info{background:rgba(129,140,248,0.1);border:1px solid rgba(129,140,248,0.2);color:var(--accent)}
+.alert-warning{background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.2);color:var(--warning)}
+.hidden{display:none}
+.dl-grid{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.dl-card{background:rgba(255,255,255,0.03);border:1px solid var(--card-border);border-radius:10px;padding:14px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.dl-card .name{font-weight:600;font-size:0.9rem;white-space:nowrap}
+.dl-card .info{font-size:0.75rem;color:var(--text-dim);white-space:nowrap}
+.dl-card .dl-actions{display:flex;gap:6px;flex-shrink:0}
+.mapping-row{display:grid;grid-template-columns:1fr auto 1fr auto;gap:8px;align-items:center;margin-bottom:8px;font-size:0.82rem}
+.mapping-arrow{color:var(--accent);font-weight:700}
+</style>
+</head>
+<body>
+  <div id="toasts" class="toast-container"></div>
+
+  <header>
+    <h1>💳 Spiff Funding CSV Generator</h1>
+    <p class="subtitle">Upload your monthly spiff report and proxy files to generate upload-ready CSVs per dealership.</p>
+  </header>
+
+  <!-- STEP 1: Upload Files -->
+  <div class="card" id="step1">
+    <h2><span class="step">1</span> Upload Files</h2>
+    <div class="upload-row">
+      <div>
+        <div class="upload-zone" id="reportDrop">
+          <div class="icon">📊</div>
+          <strong>Monthly Spiff Report</strong>
+          <p>Drop your report_A47 .xlsx file here, or click to browse</p>
+        </div>
+        <div id="reportTag"></div>
+      </div>
+      <div>
+        <div class="upload-zone" id="proxyDrop">
+          <div class="icon">👥</div>
+          <strong>Proxy Number Files</strong>
+          <p>Drop one or more dealership proxy .xlsx files here, or click to browse</p>
+        </div>
+        <div id="proxyTags"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 2: Configuration -->
+  <div class="card" id="step2">
+    <h2><span class="step">2</span> Configuration</h2>
+    <div class="config-row">
+      <label>Spiff Month:</label>
+      <select id="monthSelect"></select>
+      <label>Output Date:</label>
+      <input type="text" id="dateInput" placeholder="M_D_YY" style="width:100px">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="clearSavedSettings()">Clear Saved Settings</button>
+    </div>
+    <h3 style="font-size:0.9rem;margin:16px 0 8px;color:var(--text-dim)">Dealership → Proxy File Mapping</h3>
+    <div class="alert-bar alert-info" style="margin-bottom:8px">
+      <span>🔗</span> Map each report dealership name to its proxy file. Set a short name for the output filename.
+    </div>
+    <div id="dealershipMap"></div>
+  </div>
+
+  <!-- STEP 3: Employee Matching -->
+  <div class="card" id="step3">
+    <h2><span class="step">3</span> Employee Matching & Review</h2>
+    <div class="alert-bar alert-info">
+      <span>ℹ️</span> Review auto-matched employees. Edit names, fix mismatches, and set up redirect rules as needed.
+    </div>
+    <div id="matchArea"></div>
+  </div>
+
+  <!-- STEP 4: Generate -->
+  <div class="card" id="step4">
+    <h2><span class="step">4</span> Generate & Download CSVs</h2>
+    <div id="generateArea">
+      <div class="empty-state">Upload files and match employees to generate CSVs</div>
+    </div>
+  </div>
+
+  <footer style="text-align:center;padding:24px;color:var(--text-dim);font-size:0.75rem">
+    Spiff Funding Tool · Settings saved in browser localStorage
+  </footer>
+
+  <script>// ===== STATE =====
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const S={
+  report:null,
+  proxies:{},
+  matches:{},
+  config:{month:null,monthYear:null,dateStr:'',aliases:{},shortNames:{},nameOverrides:{},blockedMatches:{},outputNameOverrides:{}},
+  redirects:[],
+  sort:{},
+  activeDealership:null,
+  lastMatchSummarySig:'',
+  lastToastSig:'',
+  lastToastAt:0,
+  legacyOverrideNotified:false,
+  legacyOverrideToastShown:false
+};
+const LS_KEY='spiffTool_';
+function save(k,v){try{localStorage.setItem(LS_KEY+k,JSON.stringify(v))}catch(e){}}
+function removeSaved(k){try{localStorage.removeItem(LS_KEY+k)}catch(e){}}
+function load(k){try{return JSON.parse(localStorage.getItem(LS_KEY+k))}catch(e){return null}}
+function loadObj(k){const v=load(k);return v&&typeof v==='object'&&!Array.isArray(v)?v:{}}
+function initConfig(){
+  S.config.aliases=loadObj('aliases');
+  S.config.shortNames=loadObj('shortNames');
+  S.config.nameOverrides=loadObj('nameOverrides');
+  S.config.blockedMatches=loadObj('blockedMatches');
+  S.config.outputNameOverrides=loadObj('outputNameOverrides');
+  const redirects=load('redirects');
+  S.redirects=Array.isArray(redirects)?redirects:[];
+  const now=new Date();
+  const pm=new Date(now.getFullYear(),now.getMonth()-1,1);
+  S.config.month=pm.getMonth();
+  S.config.monthYear=pm.getFullYear();
+  S.config.dateStr=`${now.getMonth()+1}_${now.getDate()}_${String(now.getFullYear()).slice(-2)}`;
+}
+function fmtMonth(i){
+  const n=MONTHS[i]||MONTHS[0];
+  return n.length>4?n.substring(0,3):n;
+}
+
+// ===== TOAST =====
+function toast(msg,type='info'){
+  const now=Date.now();
+  const sig=type+':'+msg;
+  if(S.lastToastSig===sig&&now-S.lastToastAt<2500)return;
+  S.lastToastSig=sig;
+  S.lastToastAt=now;
+  const c=document.getElementById('toasts');
+  if(!c)return;
+  const d=document.createElement('div');
+  d.className='toast toast-'+type;
+  d.textContent=msg;
+  c.appendChild(d);
+  setTimeout(()=>d.remove(),5000);
+}
+function notifyMatchSummary(saved,reviews,unmatched){
+  const sig=`${saved}|${reviews}|${unmatched}`;
+  if(S.lastMatchSummarySig===sig)return;
+  S.lastMatchSummarySig=sig;
+  if(saved>0)toast(`${saved} employee match(es) loaded from saved overrides`,'info');
+  if(reviews>0)toast(`${reviews} employee(s) need review - last name matched but first name differs`,'warning');
+  if(unmatched>0)toast(`${unmatched} employee(s) could not be matched`,'error');
+}
+
+// ===== SAFE OUTPUT / KEYS =====
+function h(v){
+  return String(v??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function jsArg(v){return h(JSON.stringify(String(v??'')))}
+function cellText(v){return String(v??'').trim()}
+function keyNorm(s){return String(s??'').toUpperCase().replace(/[^A-Z0-9]/g,'')}
+function norm(s){return String(s??'').toUpperCase().replace(/[^A-Z]/g,'')}
+function domId(prefix,value){
+  let hash=0;
+  const s=String(value??'');
+  for(let i=0;i<s.length;i++)hash=((hash<<5)-hash+s.charCodeAt(i))|0;
+  return `${prefix}-${Math.abs(hash).toString(36)}`;
+}
+function csvCell(v){
+  const s=String(v??'');
+  return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
+}
+function csvRow(cells){return cells.map(csvCell).join(',')+'\n'}
+function requireSheetJS(){
+  if(typeof XLSX==='undefined')throw new Error('The SheetJS parser did not load. Make sure xlsx.full.min.js is in the same folder as this HTML file.');
+}
+
+// ===== PARSE REPORT =====
+function parseReport(data){
+  requireSheetJS();
+  const wb=XLSX.read(data,{type:'array'});
+  const entries=[];
+  for(const sn of wb.SheetNames){
+    const ws=wb.Sheets[sn];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+    if(rows.length<3)continue;
+    const type=sn.toLowerCase().includes('tech')?'Technician':'Advisor';
+    for(let i=2;i<rows.length;i++){
+      const r=rows[i];
+      if(!r||!r[1])continue;
+      const name=cellText(r[1]);
+      if(!name)continue;
+      const dealership=cellText(r[4]);
+      if(!dealership)continue;
+      let amt=String(r[7]||'0').replace(/[$,]/g,'');
+      amt=parseFloat(amt)||0;
+      if(amt<=0)continue;
+      const parts=name.split(',');
+      const lastName=cellText(parts[0]);
+      const firstName=cellText(parts.slice(1).join(','));
+      entries.push({
+        id:`${sn}:${i}:${name}:${dealership}:${type}:${cellText(r[3])}`,
+        name,
+        firstName,
+        lastName,
+        dealership,
+        amount:Math.round(amt),
+        type,
+        techNum:cellText(r[3]),
+        sourceSheet:sn,
+        sourceRow:i+1
+      });
+    }
+  }
+  S.report=entries;
+  return entries;
+}
+
+// ===== PARSE PROXY =====
+function parseProxy(data,fileName){
+  requireSheetJS();
+  const wb=XLSX.read(data,{type:'array'});
+  const employees=[];
+  for(const sn of wb.SheetNames){
+    const ws=wb.Sheets[sn];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
+    if(rows.length<2)continue;
+    const hrow=rows[0].map(c=>cellText(c).toLowerCase());
+    let fi=-1,li=-1,pi=-1;
+    for(let j=0;j<hrow.length;j++){
+      if(hrow[j].includes('first')&&hrow[j].includes('name'))fi=j;
+      if(hrow[j]==='name_first')fi=j;
+      if(hrow[j].includes('last')&&hrow[j].includes('name'))li=j;
+      if(hrow[j]==='name_last')li=j;
+      if(hrow[j].includes('proxy'))pi=j;
+    }
+    if(fi<0||li<0||pi<0)continue;
+    for(let i=1;i<rows.length;i++){
+      const r=rows[i];
+      if(!r)continue;
+      const fn=cellText(r[fi]);
+      const ln=cellText(r[li]);
+      const pn=cellText(r[pi]);
+      if(!fn||!ln||!pn)continue;
+      employees.push({firstName:fn,lastName:ln,proxy:pn});
+    }
+    if(employees.length>0)break;
+  }
+  return employees;
+}
+
+// ===== DEALERSHIP MATCHING =====
+function getDealerships(){
+  if(!S.report)return[];
+  const s=new Set();
+  S.report.forEach(e=>s.add(e.dealership));
+  return[...s];
+}
+function getProxyKey(dealership){return S.config.aliases[dealership]||dealership}
+function guessProxyDealership(fileName,reportDealerships){
+  const fn=fileName.toLowerCase().replace(/[_\-.]+/g,' ').replace(/\bxlsx?\b/g,' ');
+  for(const[rn,pn]of Object.entries(S.config.aliases)){
+    if(fn.includes(pn.toLowerCase()))return rn;
+  }
+  for(const rd of reportDealerships){
+    const words=rd.toLowerCase().split(/\s+/);
+    if(words.some(w=>w.length>2&&fn.includes(w)))return rd;
+  }
+  return null;
+}
+function reportPersonKey(re){
+  const key=[keyNorm(re.firstName),keyNorm(re.lastName),keyNorm(re.techNum),keyNorm(re.type)].join('|');
+  return key.replace(/\|/g,'')?key:keyNorm(re.name);
+}
+function employeeKey(pe){return [keyNorm(pe.proxy),keyNorm(pe.firstName),keyNorm(pe.lastName)].join('|')}
+function proxyKeyId(proxyKey){return keyNorm(proxyKey)||String(proxyKey??'').toLowerCase()}
+function overrideKey(dealership,re){return `${keyNorm(dealership)}::${reportPersonKey(re)}`}
+function legacyOverrideKey(dealership,re){return dealership+':'+re.name}
+function blockKey(dealership,re,proxyKey,pe){return `${keyNorm(dealership)}::${reportPersonKey(re)}::${proxyKeyId(proxyKey)}::${employeeKey(pe)}`}
+function matchedPersonId(dealership,pe){return `proxy:${keyNorm(dealership)}:${proxyKeyId(getProxyKey(dealership))}:${employeeKey(pe)}`}
+function reportSourceId(dealership,re){return `report:${keyNorm(dealership)}:${reportPersonKey(re)}`}
+function getRedirectSourceId(dealership,m){return m.proxy?matchedPersonId(dealership,m.proxy):reportSourceId(dealership,m.report)}
+function getRedirectTargetId(dealership,m){return m.proxy?matchedPersonId(dealership,m.proxy):null}
+function getSourceLabel(m){return m.proxy?`${m.proxy.firstName} ${m.proxy.lastName}`:`${m.report.firstName} ${m.report.lastName}`}
+function makeNameOverride(proxyKey,pe){return {proxyKey,employeeKey:employeeKey(pe),proxy:pe.proxy,firstName:pe.firstName,lastName:pe.lastName}}
+function findProxyFromOverride(override,proxyList,proxyKey){
+  if(!override||typeof override!=='object')return null;
+  if(override.proxyKey&&override.proxyKey!==proxyKey)return null;
+  let found=null;
+  if(override.employeeKey)found=proxyList.find(pe=>employeeKey(pe)===override.employeeKey);
+  if(!found&&override.proxy){
+    const byProxy=proxyList.filter(pe=>String(pe.proxy)===String(override.proxy));
+    if(byProxy.length===1)found=byProxy[0];
+    else found=byProxy.find(pe=>norm(pe.firstName)===norm(override.firstName)&&norm(pe.lastName)===norm(override.lastName))||null;
+  }
+  if(!found&&override.firstName&&override.lastName){
+    found=proxyList.find(pe=>norm(pe.firstName)===norm(override.firstName)&&norm(pe.lastName)===norm(override.lastName))||null;
+  }
+  if(!found)return null;
+  return {pe:found,idx:proxyList.indexOf(found)};
+}
+function resolveSavedOverride(dealership,re,proxyList,proxyKey){
+  const key=overrideKey(dealership,re);
+  const legacy=legacyOverrideKey(dealership,re);
+  for(const k of [key,legacy]){
+    const override=S.config.nameOverrides[k];
+    if(override===undefined||override===null)continue;
+    if(typeof override==='number'){
+      S.legacyOverrideNotified=true;
+      continue;
+    }
+    const resolved=findProxyFromOverride(override,proxyList,proxyKey);
+    if(resolved){
+      if(k!==key){
+        S.config.nameOverrides[key]=makeNameOverride(proxyKey,resolved.pe);
+        delete S.config.nameOverrides[k];
+        save('nameOverrides',S.config.nameOverrides);
+      }
+      return resolved;
+    }
+  }
+  return null;
+}
+function saveNameOverride(dealership,re,proxyKey,pe){
+  S.config.nameOverrides[overrideKey(dealership,re)]=makeNameOverride(proxyKey,pe);
+  delete S.config.nameOverrides[legacyOverrideKey(dealership,re)];
+  save('nameOverrides',S.config.nameOverrides);
+}
+function deleteNameOverride(dealership,re){
+  delete S.config.nameOverrides[overrideKey(dealership,re)];
+  delete S.config.nameOverrides[legacyOverrideKey(dealership,re)];
+  save('nameOverrides',S.config.nameOverrides);
+}
+function isBlocked(dealership,re,proxyKey,pe){return !!S.config.blockedMatches[blockKey(dealership,re,proxyKey,pe)]}
+function blockMatch(dealership,re,proxyKey,pe){
+  S.config.blockedMatches[blockKey(dealership,re,proxyKey,pe)]=true;
+  save('blockedMatches',S.config.blockedMatches);
+}
+function clearBlockedMatch(dealership,re,proxyKey,pe){
+  delete S.config.blockedMatches[blockKey(dealership,re,proxyKey,pe)];
+  save('blockedMatches',S.config.blockedMatches);
+}
+function outputNameKey(dealership,m){
+  return m.proxy?`proxyName:${matchedPersonId(dealership,m.proxy)}`:`reportName:${reportSourceId(dealership,m.report)}`;
+}
+function applyOutputNameOverride(dealership,m){
+  const saved=S.config.outputNameOverrides[outputNameKey(dealership,m)];
+  if(saved&&typeof saved==='object'){
+    if(saved.firstName!==undefined)m.outFirst=saved.firstName;
+    if(saved.lastName!==undefined)m.outLast=saved.lastName;
+  }
+  return m;
+}
+function saveOutputNameOverride(dealership,m){
+  S.config.outputNameOverrides[outputNameKey(dealership,m)]={firstName:m.outFirst,lastName:m.outLast};
+  save('outputNameOverrides',S.config.outputNameOverrides);
+}
+function makeMatch(dealership,re,pe,idx,status,candidates){
+  const m={report:re,proxy:pe||null,proxyIdx:idx,status,outFirst:pe?pe.firstName:re.firstName,outLast:pe?pe.lastName:re.lastName};
+  if(candidates)m.candidates=candidates;
+  return applyOutputNameOverride(dealership,m);
+}
+function matchEmployees(dealership){
+  const reportEntries=S.report.filter(e=>e.dealership===dealership);
+  const proxyKey=getProxyKey(dealership);
+  const proxyList=S.proxies[proxyKey]||[];
+  const results=[];
+  for(const re of reportEntries){
+    const saved=resolveSavedOverride(dealership,re,proxyList,proxyKey);
+    if(saved){results.push(makeMatch(dealership,re,saved.pe,saved.idx,'saved'));continue;}
+    const candidates=[];
+    for(let j=0;j<proxyList.length;j++){
+      const pe=proxyList[j];
+      if(isBlocked(dealership,re,proxyKey,pe))continue;
+      if(norm(pe.lastName)===norm(re.lastName))candidates.push({pe,idx:j});
+    }
+    if(candidates.length===1){
+      const c=candidates[0];
+      const firstMatch=norm(c.pe.firstName).startsWith(norm(re.firstName).substring(0,3));
+      results.push(makeMatch(dealership,re,c.pe,c.idx,firstMatch?'auto':'review'));
+    }else if(candidates.length>1){
+      let best=null;
+      for(const c of candidates){
+        const rfn=norm(re.firstName);
+        const pfn=norm(c.pe.firstName);
+        if(pfn.startsWith(rfn.substring(0,3))||rfn.startsWith(pfn.substring(0,3))){best=c;break;}
+      }
+      if(best)results.push(makeMatch(dealership,re,best.pe,best.idx,'auto'));
+      else results.push(makeMatch(dealership,re,null,-1,'unmatched',candidates));
+    }else{
+      results.push(makeMatch(dealership,re,null,-1,'unmatched'));
+    }
+  }
+  S.matches[dealership]=results;
+  return results;
+}
+
+// ===== REDIRECTS / CSV GENERATION =====
+function findLegacySourceMatch(matches,rule){
+  const ff=norm(rule.fromFirst),fl=norm(rule.fromLast);
+  return matches.find(m=>{
+    const src=m.proxy?m.proxy:m.report;
+    return norm(src.firstName)===ff&&norm(src.lastName)===fl;
+  })||null;
+}
+function findLegacyTargetMatch(matches,rule){
+  const tf=norm(rule.toFirst),tl=norm(rule.toLast);
+  return matches.find(m=>m.proxy&&norm(m.proxy.firstName)===tf&&norm(m.proxy.lastName)===tl)||null;
+}
+function resolveRedirectRule(dealership,matches,rule){
+  const fromMatch=rule.fromId?matches.find(m=>getRedirectSourceId(dealership,m)===rule.fromId):findLegacySourceMatch(matches,rule);
+  const toMatch=rule.toId?matches.find(m=>m.proxy&&getRedirectTargetId(dealership,m)===rule.toId):findLegacyTargetMatch(matches,rule);
+  if(!fromMatch||!toMatch||!toMatch.proxy)return null;
+  const fromId=getRedirectSourceId(dealership,fromMatch);
+  const toId=getRedirectTargetId(dealership,toMatch);
+  if(!fromId||!toId||fromId===toId)return null;
+  return {rule,fromMatch,toMatch,fromId,toId,fromLabel:getSourceLabel(fromMatch),toLabel:getSourceLabel(toMatch)};
+}
+function buildRedirectPlan(dealership,matches){
+  const rules=[];
+  const sourceIds=new Set();
+  const targetIds=new Set();
+  let skipped=0;
+  for(const rule of S.redirects){
+    if(rule.dealership!==dealership)continue;
+    const resolved=resolveRedirectRule(dealership,matches,rule);
+    if(!resolved){skipped++;continue;}
+    if(sourceIds.has(resolved.fromId)||sourceIds.has(resolved.toId)||targetIds.has(resolved.fromId)){
+      skipped++;
+      continue;
+    }
+    rules.push(resolved);
+    sourceIds.add(resolved.fromId);
+    targetIds.add(resolved.toId);
+  }
+  return {rules,sourceIds,targetIds,skipped};
+}
+function buildCsvState(dealership,matchesOverride){
+  const matches=matchesOverride||S.matches[dealership]||[];
+  const rows={};
+  const sourceAmounts={};
+  const sourceLabels={};
+  for(const m of matches){
+    const sourceId=getRedirectSourceId(dealership,m);
+    sourceAmounts[sourceId]=(sourceAmounts[sourceId]||0)+m.report.amount;
+    sourceLabels[sourceId]=getSourceLabel(m);
+    if(!m.proxy)continue;
+    const rowId=getRedirectTargetId(dealership,m);
+    if(!rows[rowId]){
+      rows[rowId]={id:rowId,proxy:m.proxy.proxy,firstName:m.outFirst,lastName:m.outLast,amount:0};
+    }
+    rows[rowId].amount+=m.report.amount;
+  }
+  const redirectPlan=buildRedirectPlan(dealership,matches);
+  const bonusesByToId={};
+  for(const rule of redirectPlan.rules){
+    const amount=sourceAmounts[rule.fromId]||0;
+    if(amount<=0)continue;
+    if(rows[rule.toId]){
+      rows[rule.toId].amount+=amount;
+      if(!bonusesByToId[rule.toId])bonusesByToId[rule.toId]=[];
+      bonusesByToId[rule.toId].push({amount,label:sourceLabels[rule.fromId]||rule.fromLabel});
+    }
+    if(rows[rule.fromId])rows[rule.fromId].amount=0;
+  }
+  return {rows,sourceAmounts,sourceLabels,redirectPlan,redirectSources:redirectPlan.sourceIds,bonusesByToId};
+}
+function generateCSV(dealership){
+  const matches=S.matches[dealership];
+  if(!matches)return null;
+  const state=buildCsvState(dealership,matches);
+  const sorted=Object.values(state.rows).filter(a=>a.amount>0).sort((a,b)=>a.lastName.toLowerCase().localeCompare(b.lastName.toLowerCase()));
+  if(!sorted.length)return null;
+  let csv=csvRow(['proxy','amount','firstName','lastName','comment','other']);
+  for(const a of sorted){
+    csv+=csvRow([a.proxy,a.amount,a.firstName,a.lastName,'','']);
+  }
+  return csv;
+}
+function getFileName(dealership){
+  const sn=S.config.shortNames[dealership]||dealership.split(/\s+/)[0];
+  const mn=fmtMonth(S.config.month);
+  return `${sn}_${mn}_Spiff_Funding_${S.config.dateStr}.csv`;
+}
+
+// ===== UI RENDERING =====
+function renderAll(){
+  renderConfig();
+  renderDealershipMap();
+  renderMatches();
+  renderGenerate();
+}
+function renderConfig(){
+  const sel=document.getElementById('monthSelect');
+  sel.innerHTML='';
+  for(let i=0;i<12;i++){
+    const o=document.createElement('option');
+    o.value=i;
+    o.textContent=MONTHS[i];
+    if(i===S.config.month)o.selected=true;
+    sel.appendChild(o);
+  }
+  document.getElementById('dateInput').value=S.config.dateStr;
+}
+function renderDealershipMap(){
+  const container=document.getElementById('dealershipMap');
+  const dealerships=getDealerships();
+  if(!dealerships.length){container.innerHTML='<div class="empty-state">Upload a spiff report to see dealerships</div>';return;}
+  const proxyKeys=Object.keys(S.proxies);
+  let html='';
+  for(const d of dealerships){
+    const mapped=S.config.aliases[d]||'';
+    const shortName=S.config.shortNames[d]||d.split(/\s+/)[0];
+    html+=`<div class="mapping-row">
+      <div><strong>${h(d)}</strong></div>
+      <div class="mapping-arrow">&rarr;</div>
+      <select onchange="setAlias(${jsArg(d)},this.value)" class="match-select">
+        <option value="">-- Select Proxy File --</option>
+        ${proxyKeys.map(k=>`<option value="${h(k)}" ${mapped===k?'selected':''}>${h(k)}</option>`).join('')}
+      </select>
+      <input type="text" value="${h(shortName)}" placeholder="Short name" style="width:100px" onchange="setShortName(${jsArg(d)},this.value)">
+    </div>`;
+  }
+  container.innerHTML=html;
+}
+function renderMatches(){
+  const container=document.getElementById('matchArea');
+  const dealerships=getDealerships();
+  if(!dealerships.length||!Object.keys(S.proxies).length){container.innerHTML='';S.activeDealership=null;return;}
+  for(const d of dealerships)matchEmployees(d);
+  let activeIdx=dealerships.indexOf(S.activeDealership);
+  if(activeIdx<0)activeIdx=0;
+  S.activeDealership=dealerships[activeIdx]||null;
+  let tabsHtml='<div class="tabs">';
+  for(let i=0;i<dealerships.length;i++){
+    const d=dealerships[i];
+    const m=S.matches[d]||[];
+    const issues=m.filter(x=>x.status==='unmatched'||x.status==='review').length;
+    tabsHtml+=`<div class="tab ${i===activeIdx?'active':''}" onclick="showDealerTab(${i},${jsArg(d)})" id="tab-${i}">${h(d)}${issues?`<span class="count" style="background:rgba(245,158,11,0.3)">${issues}</span>`:''}</div>`;
+  }
+  tabsHtml+='</div>';
+  let panelsHtml='';
+  for(let i=0;i<dealerships.length;i++){
+    const d=dealerships[i];
+    panelsHtml+=`<div class="dealer-panel ${i!==activeIdx?'hidden':''}" id="panel-${i}">${renderMatchTable(d)}${renderRedirectSection(d)}</div>`;
+  }
+  container.innerHTML=tabsHtml+panelsHtml;
+  const allMatches=Object.values(S.matches).flat();
+  const saved=allMatches.filter(m=>m.status==='saved').length;
+  const reviews=allMatches.filter(m=>m.status==='review').length;
+  const unmatched=allMatches.filter(m=>m.status==='unmatched').length;
+  notifyMatchSummary(saved,reviews,unmatched);
+  if(S.legacyOverrideNotified&&!S.legacyOverrideToastShown){
+    S.legacyOverrideToastShown=true;
+    toast('Legacy saved match indexes were ignored. Please review and confirm those matches again.','warning');
+  }
+}
+function uniqueMatches(matches,predicate,idFn){
+  const seen=new Set();
+  const out=[];
+  for(const m of matches){
+    if(!predicate(m))continue;
+    const id=idFn(m);
+    if(!id||seen.has(id))continue;
+    seen.add(id);
+    out.push(m);
+  }
+  return out;
+}
+function renderRedirectSection(dealership){
+  const matches=S.matches[dealership]||[];
+  const matched=matches.filter(m=>m.proxy);
+  if(!matched.length)return'';
+  const state=buildCsvState(dealership,matches);
+  const plan=state.redirectPlan;
+  const fromElId=domId('redir-from',dealership);
+  const toElId=domId('redir-to',dealership);
+  let html=`<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--card-border)"><h3 style="font-size:0.9rem;margin-bottom:8px">Spiff Redirects for ${h(dealership)}</h3>`;
+  if(plan.rules.length){
+    for(const r of plan.rules){
+      const idx=S.redirects.indexOf(r.rule);
+      html+=`<div class="redirect-rule"><strong>${h(r.fromLabel)}</strong><span class="arrow">&rarr;</span><strong>${h(r.toLabel)}</strong><button class="btn btn-danger btn-sm" onclick="removeRedirect(${idx})">Remove</button></div>`;
+    }
+  }
+  if(plan.skipped>0){
+    html+=`<div class="alert-bar alert-warning" style="margin-top:8px">${plan.skipped} stale or conflicting redirect rule(s) skipped. <button class="btn btn-danger btn-sm" onclick="cleanupRedirects(${jsArg(dealership)})">Clean Up</button></div>`;
+  }
+  let fromOpts='';
+  const unmatched=uniqueMatches(matches,m=>!m.proxy,m=>getRedirectSourceId(dealership,m));
+  if(unmatched.length){
+    fromOpts+=`<optgroup label="Unmatched (report only)">${unmatched.map(m=>{
+      const id=getRedirectSourceId(dealership,m);
+      return `<option value="${h(id)}">${h(getSourceLabel(m))} ($${state.sourceAmounts[id]||0})</option>`;
+    }).join('')}</optgroup>`;
+  }
+  const matchedSources=uniqueMatches(matches,m=>!!m.proxy,m=>getRedirectSourceId(dealership,m));
+  fromOpts+=`<optgroup label="Matched">${matchedSources.map(m=>{
+    const id=getRedirectSourceId(dealership,m);
+    return `<option value="${h(id)}">${h(getSourceLabel(m))} ($${state.sourceAmounts[id]||0})</option>`;
+  }).join('')}</optgroup>`;
+  const targets=uniqueMatches(matches,m=>!!m.proxy,m=>getRedirectTargetId(dealership,m));
+  const toOpts=targets.map(m=>`<option value="${h(getRedirectTargetId(dealership,m))}">${h(getSourceLabel(m))}</option>`).join('');
+  html+=`<div class="redirect-add"><label style="font-size:0.8rem;color:var(--text-dim);min-width:auto">From:</label><select id="${h(fromElId)}">${fromOpts}</select><span class="arrow" style="color:var(--accent);font-weight:700">&rarr;</span><label style="font-size:0.8rem;color:var(--text-dim);min-width:auto">To:</label><select id="${h(toElId)}">${toOpts}</select><button class="btn btn-secondary btn-sm" onclick="addRedirectForDealer(${jsArg(dealership)},${jsArg(fromElId)},${jsArg(toElId)})">Add</button></div></div>`;
+  return html;
+}
+function sortMatchesFor(dealership,col){
+  const cur=S.sort[dealership];
+  if(cur&&cur.col===col)S.sort[dealership]={col,dir:cur.dir==='asc'?'desc':'asc'};
+  else S.sort[dealership]={col,dir:'asc'};
+  S.activeDealership=dealership;
+  renderMatches();renderGenerate();
+}
+function renderMatchTable(dealership){
+  const matches=S.matches[dealership]||[];
+  const proxyKey=getProxyKey(dealership);
+  const proxyList=S.proxies[proxyKey]||[];
+  if(!matches.length)return'<div class="empty-state">No entries found for this dealership</div>';
+  const sortState=S.sort[dealership];
+  if(sortState){
+    const dir=sortState.dir==='asc'?1:-1;
+    const col=sortState.col;
+    matches.sort((a,b)=>{
+      let va,vb;
+      if(col==='name'){va=a.report.name;vb=b.report.name;}
+      else if(col==='type'){va=a.report.type;vb=b.report.type;}
+      else if(col==='matched'){va=a.proxy?(a.proxy.firstName+' '+a.proxy.lastName):'';vb=b.proxy?(b.proxy.firstName+' '+b.proxy.lastName):'';}
+      else if(col==='amount'){va=a.report.amount;vb=b.report.amount;return (va-vb)*dir;}
+      else if(col==='first'){va=a.outFirst;vb=b.outFirst;}
+      else if(col==='last'){va=a.outLast;vb=b.outLast;}
+      else if(col==='status'){va=a.status;vb=b.status;}
+      else return 0;
+      return String(va||'').localeCompare(String(vb||''))*dir;
+    });
+  }
+  const state=buildCsvState(dealership,matches);
+  const arrow=(col)=>{if(!sortState||sortState.col!==col)return' &harr;';return sortState.dir==='asc'?' &uarr;':' &darr;';};
+  const cols=[['name','Report Name'],['type','Type'],['matched','Matched To'],['','Proxy #'],['amount','Amount'],['first','First Name'],['last','Last Name'],['status','Status'],['','Actions']];
+  let html='<table><thead><tr>';
+  for(const[key,label] of cols){
+    if(key)html+=`<th style="cursor:pointer;user-select:none" onclick="sortMatchesFor(${jsArg(dealership)},'${key}')">${h(label)}<span style="opacity:0.4;font-size:0.7rem">${arrow(key)}</span></th>`;
+    else html+=`<th>${h(label)}</th>`;
+  }
+  html+='</tr></thead><tbody>';
+  for(let i=0;i<matches.length;i++){
+    const m=matches[i];
+    const sourceId=getRedirectSourceId(dealership,m);
+    const targetId=getRedirectTargetId(dealership,m);
+    const isRedirFrom=state.redirectSources.has(sourceId);
+    const redirTo=targetId?(state.bonusesByToId[targetId]||[]):[];
+    const rowStyle=isRedirFrom?'opacity:0.45;':'';
+    let statusClass=m.status==='auto'||m.status==='saved'?'status-matched':m.status==='review'?'status-review':'status-unmatched';
+    let statusLabel=m.status==='auto'?'Auto':m.status==='saved'?'Saved':m.status==='review'?'Review':'No Match';
+    if(isRedirFrom){statusClass='status-review';statusLabel='Redirected';}
+    const proxyDisplay=m.proxy?`${m.proxy.firstName} ${m.proxy.lastName}`:'-';
+    const proxyNum=m.proxy?m.proxy.proxy:'-';
+    let redirNote='';
+    let amtDisplay=`$${m.report.amount}`;
+    if(isRedirFrom){
+      amtDisplay=`<s style="color:var(--text-dim)">$${m.report.amount}</s>`;
+    }else if(redirTo.length&&targetId&&state.rows[targetId]){
+      const total=state.rows[targetId].amount;
+      const parts=redirTo.map(r=>`received $${r.amount} from ${h(r.label)}`);
+      amtDisplay=`<strong style="color:var(--success)">$${total}</strong>`;
+      redirNote=`<div style="font-size:0.7rem;color:var(--accent);margin-top:2px">${parts.join('<br>')}</div>`;
+    }
+    let matchedCol;
+    const proxyOptions=proxyList.map((p,j)=>`<option value="${j}" ${j===m.proxyIdx?'selected':''}>${h(p.firstName)} ${h(p.lastName)}</option>`).join('');
+    if(isRedirFrom){matchedCol='-';}
+    else if(m.status==='review'){
+      matchedCol=`<div style="margin-bottom:4px">${h(proxyDisplay)}</div><select class="match-select" onchange="manualMatch(${jsArg(dealership)},${i},this.value)" style="font-size:0.75rem"><option value="-1">Change match...</option>${proxyOptions}</select>`;
+    }else if(m.proxy){matchedCol=h(proxyDisplay);}
+    else{matchedCol=`<select class="match-select" onchange="manualMatch(${jsArg(dealership)},${i},this.value)"><option value="-1">-- Select --</option>${proxyOptions}</select>`;}
+    let actionsCol='';
+    if(!isRedirFrom){
+      if(m.status==='review')actionsCol=`<button class="btn btn-success btn-sm" onclick="confirmMatch(${jsArg(dealership)},${i})" title="Confirm match">Confirm</button> <button class="btn btn-secondary btn-sm" onclick="clearMatch(${jsArg(dealership)},${i})" title="Unmatch">Unmatch</button>`;
+      else if(m.proxy)actionsCol=`<button class="btn btn-secondary btn-sm" onclick="clearMatch(${jsArg(dealership)},${i})">Unmatch</button>`;
+    }
+    html+=`<tr style="${rowStyle}">
+      <td>${h(m.report.name)}</td>
+      <td style="font-size:0.75rem;color:var(--text-dim)">${h(m.report.type)}</td>
+      <td>${matchedCol}</td>
+      <td style="font-family:monospace;font-size:0.75rem">${h(proxyNum)}</td>
+      <td>${amtDisplay}${redirNote}</td>
+      <td>${isRedirFrom?`<span style="color:var(--text-dim)">${h(m.outFirst)}</span>`:`<input class="editable" value="${h(m.outFirst)}" onchange="editName(${jsArg(dealership)},${i},'first',this.value)" style="width:100px">`}</td>
+      <td>${isRedirFrom?`<span style="color:var(--text-dim)">${h(m.outLast)}</span>`:`<input class="editable" value="${h(m.outLast)}" onchange="editName(${jsArg(dealership)},${i},'last',this.value)" style="width:100px">`}</td>
+      <td><span class="status-badge ${statusClass}">${h(statusLabel)}</span></td>
+      <td>${actionsCol}</td>
+    </tr>`;
+  }
+  html+='</tbody></table>';
+  return html;
+}
+function renderGenerate(){
+  const container=document.getElementById('generateArea');
+  const dealerships=getDealerships();
+  const hasRows=dealerships.some(d=>{
+    const state=buildCsvState(d,S.matches[d]||[]);
+    return Object.values(state.rows).some(a=>a.amount>0);
+  });
+  if(!hasRows){container.innerHTML='<div class="empty-state">Match employees above to generate CSVs</div>';return;}
+  let html='<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-success" onclick="generateAll()">Generate & Download All</button></div>';
+  html+='<div class="dl-grid">';
+  for(const d of dealerships){
+    const state=buildCsvState(d,S.matches[d]||[]);
+    const count=Object.values(state.rows).filter(a=>a.amount>0).length;
+    if(!count)continue;
+    const fn=getFileName(d);
+    html+=`<div class="dl-card"><div><div class="name">${h(d)}</div><div class="info">${h(fn)} · ${count} entries</div></div><div class="dl-actions"><button class="btn btn-secondary btn-sm" onclick="previewCSV(${jsArg(d)})">Preview</button><button class="btn btn-primary btn-sm" onclick="downloadOne(${jsArg(d)})">Download</button></div></div>`;
+  }
+  html+='</div><div id="csvPreview"></div>';
+  container.innerHTML=html;
+}
+
+// ===== EVENT HANDLERS =====
+function showDealerTab(idx,d){
+  S.activeDealership=d;
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',i===idx));
+  document.querySelectorAll('.dealer-panel').forEach((p,i)=>p.classList.toggle('hidden',i!==idx));
+}
+function setAlias(reportName,proxyKey){
+  if(proxyKey)S.config.aliases[reportName]=proxyKey;
+  else delete S.config.aliases[reportName];
+  save('aliases',S.config.aliases);
+  S.activeDealership=reportName;
+  renderMatches();renderGenerate();
+}
+function setShortName(dealership,name){
+  S.config.shortNames[dealership]=name;
+  save('shortNames',S.config.shortNames);
+  renderGenerate();
+}
+function confirmMatch(dealership,matchIdx){
+  const m=S.matches[dealership][matchIdx];
+  if(!m||!m.proxy)return;
+  const proxyKey=getProxyKey(dealership);
+  m.status='saved';
+  saveNameOverride(dealership,m.report,proxyKey,m.proxy);
+  clearBlockedMatch(dealership,m.report,proxyKey,m.proxy);
+  toast(`Confirmed match: ${m.report.name} -> ${m.proxy.firstName} ${m.proxy.lastName}`,'success');
+  renderMatches();renderGenerate();
+}
+function manualMatch(dealership,matchIdx,proxyIdx){
+  proxyIdx=parseInt(proxyIdx,10);
+  if(proxyIdx<0){clearMatch(dealership,matchIdx);return;}
+  const proxyKey=getProxyKey(dealership);
+  const proxyList=S.proxies[proxyKey]||[];
+  const m=S.matches[dealership][matchIdx];
+  if(proxyIdx>=0&&proxyList[proxyIdx]&&m){
+    m.proxy=proxyList[proxyIdx];
+    m.proxyIdx=proxyIdx;
+    m.status='saved';
+    m.outFirst=m.proxy.firstName;
+    m.outLast=m.proxy.lastName;
+    applyOutputNameOverride(dealership,m);
+    saveNameOverride(dealership,m.report,proxyKey,m.proxy);
+    clearBlockedMatch(dealership,m.report,proxyKey,m.proxy);
+    toast(`Saved match: ${m.report.name} -> ${m.proxy.firstName} ${m.proxy.lastName}`,'success');
+  }
+  renderMatches();renderGenerate();
+}
+function editName(dealership,matchIdx,field,value){
+  const m=S.matches[dealership][matchIdx];
+  if(!m)return;
+  if(field==='first')m.outFirst=value;
+  else m.outLast=value;
+  saveOutputNameOverride(dealership,m);
+  renderGenerate();
+}
+function clearMatch(dealership,matchIdx){
+  const m=S.matches[dealership][matchIdx];
+  if(!m)return;
+  const proxyKey=getProxyKey(dealership);
+  if(m.proxy)blockMatch(dealership,m.report,proxyKey,m.proxy);
+  deleteNameOverride(dealership,m.report);
+  toast(`Unmatched ${m.report.name}`,'info');
+  renderMatches();renderGenerate();
+}
+function removeRedirect(idx){
+  if(idx<0)return;
+  S.redirects.splice(idx,1);
+  save('redirects',S.redirects);
+  renderMatches();renderGenerate();
+}
+function cleanupRedirects(dealership){
+  const matches=S.matches[dealership]||[];
+  const plan=buildRedirectPlan(dealership,matches);
+  const valid=new Set(plan.rules.map(r=>r.rule));
+  const before=S.redirects.length;
+  S.redirects=S.redirects.filter(r=>r.dealership!==dealership||valid.has(r));
+  save('redirects',S.redirects);
+  renderMatches();renderGenerate();
+  toast(`Removed ${before-S.redirects.length} skipped redirect rule(s)`,'success');
+}
+function addRedirectForDealer(dealership,fromElId,toElId){
+  const fromEl=document.getElementById(fromElId);
+  const toEl=document.getElementById(toElId);
+  if(!fromEl||!toEl)return;
+  const fromId=fromEl.value;
+  const toId=toEl.value;
+  if(!fromId||!toId){toast('Select both employees','warning');return;}
+  if(fromId===toId){toast('From and To cannot be the same person','warning');return;}
+  const matches=S.matches[dealership]||[];
+  const fromMatch=matches.find(m=>getRedirectSourceId(dealership,m)===fromId);
+  const toMatch=matches.find(m=>m.proxy&&getRedirectTargetId(dealership,m)===toId);
+  if(!fromMatch||!toMatch){toast('Selected redirect employees are no longer available','warning');return;}
+  const plan=buildRedirectPlan(dealership,matches);
+  if(plan.sourceIds.has(fromId)){toast('That employee is already redirected','warning');return;}
+  if(plan.sourceIds.has(toId)){toast('That target already redirects to someone else','warning');return;}
+  if(plan.targetIds.has(fromId)){toast('That source already receives redirected funds','warning');return;}
+  const fromPerson=fromMatch.proxy?fromMatch.proxy:fromMatch.report;
+  S.redirects.push({
+    dealership,
+    fromId,
+    toId,
+    fromFirst:fromPerson.firstName,
+    fromLast:fromPerson.lastName,
+    toFirst:toMatch.proxy.firstName,
+    toLast:toMatch.proxy.lastName
+  });
+  save('redirects',S.redirects);
+  renderMatches();renderGenerate();
+  toast('Redirect rule added','success');
+}
+function previewCSV(dealership){
+  const csv=generateCSV(dealership);
+  const el=document.getElementById('csvPreview');
+  el.innerHTML=csv?`<div style="margin-top:12px"><strong>${h(getFileName(dealership))}</strong><div class="preview-box">${h(csv)}</div></div>`:'<div class="alert-bar alert-warning">No matched entries</div>';
+}
+function downloadOne(dealership){
+  const csv=generateCSV(dealership);
+  if(!csv){toast('No data to download','error');return;}
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=getFileName(dealership);
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),0);
+  toast(`Downloaded ${getFileName(dealership)}`,'success');
+}
+function generateAll(){
+  const dealerships=getDealerships();
+  let count=0;
+  for(const d of dealerships){
+    const csv=generateCSV(d);
+    if(!csv)continue;
+    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=getFileName(d);
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),0);
+    count++;
+  }
+  toast(count?`Generated ${count} CSV file(s)`:'No CSV files were generated',count?'success':'warning');
+}
+function clearSavedSettings(){
+  if(!confirm('Clear saved dealership mappings, match overrides, blocked matches, edited names, and redirects?'))return;
+  ['aliases','shortNames','nameOverrides','blockedMatches','outputNameOverrides','redirects'].forEach(removeSaved);
+  S.config.aliases={};
+  S.config.shortNames={};
+  S.config.nameOverrides={};
+  S.config.blockedMatches={};
+  S.config.outputNameOverrides={};
+  S.redirects=[];
+  S.lastMatchSummarySig='';
+  renderAll();
+  toast('Saved settings cleared','success');
+}
+
+// ===== FILE HANDLING =====
+function handleReport(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const entries=parseReport(data);
+      document.getElementById('reportTag').innerHTML=`<div class="file-tag">${h(file.name)} (${entries.length} entries with spiffs) <span class="remove" onclick="clearReport()">x</span></div>`;
+      S.lastMatchSummarySig='';
+      toast(`Report loaded: ${entries.length} entries with spiffs > $0`,'success');
+      tryAutoMap();
+      renderAll();
+    }catch(err){
+      toast(`Could not read ${file.name}: ${err.message||err}`,'error');
+    }
+  };
+  reader.onerror=function(){toast(`Could not read ${file.name}`,'error')};
+  reader.readAsArrayBuffer(file);
+}
+function handleProxy(file){
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=new Uint8Array(e.target.result);
+      const employees=parseProxy(data,file.name);
+      if(!employees.length){toast(`No proxy data found in ${file.name}`,'warning');return;}
+      let key=file.name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/_proxy_numbers/i,'').replace(/proxy\s*numbers?/i,'').replace(/cards?\s*/i,'').trim();
+      key=key||file.name;
+      S.proxies[key]=employees;
+      renderProxyTags();
+      S.lastMatchSummarySig='';
+      toast(`Loaded ${employees.length} employees from ${file.name}`,'success');
+      tryAutoMap();
+      renderAll();
+    }catch(err){
+      toast(`Could not read ${file.name}: ${err.message||err}`,'error');
+    }
+  };
+  reader.onerror=function(){toast(`Could not read ${file.name}`,'error')};
+  reader.readAsArrayBuffer(file);
+}
+function tryAutoMap(){
+  if(!S.report)return;
+  const dealerships=getDealerships();
+  const proxyKeys=Object.keys(S.proxies);
+  let changed=false;
+  for(const d of dealerships){
+    if(S.config.aliases[d])continue;
+    for(const pk of proxyKeys){
+      const dw=d.toLowerCase().split(/\s+/);
+      const pw=pk.toLowerCase().split(/\s+/);
+      if(dw.some(w=>w.length>2&&pw.some(p=>p.includes(w)))||pw.some(w=>w.length>2&&dw.some(p=>p.includes(w)))){
+        S.config.aliases[d]=pk;
+        changed=true;
+        break;
+      }
+    }
+  }
+  if(changed)save('aliases',S.config.aliases);
+}
+function clearReport(){
+  S.report=null;
+  S.matches={};
+  S.activeDealership=null;
+  S.lastMatchSummarySig='';
+  document.getElementById('reportTag').innerHTML='';
+  renderAll();
+}
+function renderProxyTags(){
+  const c=document.getElementById('proxyTags');
+  c.innerHTML=Object.entries(S.proxies).map(([k,v])=>`<div class="file-tag">${h(k)} (${v.length}) <span class="remove" onclick="removeProxy(${jsArg(k)})">x</span></div>`).join('');
+}
+function removeProxy(key){
+  delete S.proxies[key];
+  renderProxyTags();
+  renderAll();
+}
+
+// ===== INIT =====
+function init(){
+  initConfig();
+  renderConfig();
+  if(typeof XLSX==='undefined')toast('SheetJS did not load. Check that xlsx.full.min.js is next to the HTML file.','error');
+  document.getElementById('monthSelect').addEventListener('change',function(){
+    S.config.month=parseInt(this.value,10);renderGenerate();
+  });
+  document.getElementById('dateInput').addEventListener('change',function(){
+    S.config.dateStr=this.value;renderGenerate();
+  });
+  ['reportDrop','proxyDrop'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.addEventListener('dragover',e=>{e.preventDefault();el.classList.add('drag-over');});
+    el.addEventListener('dragleave',()=>el.classList.remove('drag-over'));
+    el.addEventListener('drop',e=>{
+      e.preventDefault();el.classList.remove('drag-over');
+      const files=[...e.dataTransfer.files];
+      files.forEach(f=>{if(id==='reportDrop')handleReport(f);else handleProxy(f);});
+    });
+    el.addEventListener('click',()=>{
+      const inp=document.createElement('input');
+      inp.type='file';
+      inp.accept='.xlsx,.xls,.csv';
+      if(id==='proxyDrop')inp.multiple=true;
+      inp.onchange=()=>[...inp.files].forEach(f=>{if(id==='reportDrop')handleReport(f);else handleProxy(f);});
+      inp.click();
+    });
+  });
+  renderAll();
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
