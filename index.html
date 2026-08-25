@@ -84,7 +84,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div id="toasts" class="toast-container"></div>
 
   <header>
-    <h1>💳 Spiff Funding CSV Generator</h1>
+    <h1>&#128179; Spiff Funding CSV Generator</h1>
     <p class="subtitle">Upload your monthly spiff report and proxy files to generate upload-ready CSVs per dealership.</p>
   </header>
 
@@ -94,15 +94,15 @@ tr:hover td{background:rgba(255,255,255,0.02)}
     <div class="upload-row">
       <div>
         <div class="upload-zone" id="reportDrop">
-          <div class="icon">📊</div>
+          <div class="icon">&#128202;</div>
           <strong>Monthly Spiff Report</strong>
-          <p>Drop your report_A47 .xlsx file here, or click to browse</p>
+          <p>Drop one or more legacy report .xlsx files or incentive export .csv files here, or click to browse</p>
         </div>
         <div id="reportTag"></div>
       </div>
       <div>
         <div class="upload-zone" id="proxyDrop">
-          <div class="icon">👥</div>
+          <div class="icon">&#128101;</div>
           <strong>Proxy Number Files</strong>
           <p>Drop one or more dealership proxy .xlsx files here, or click to browse</p>
         </div>
@@ -121,9 +121,9 @@ tr:hover td{background:rgba(255,255,255,0.02)}
       <input type="text" id="dateInput" placeholder="M_D_YY" style="width:100px">
       <button type="button" class="btn btn-secondary btn-sm" onclick="clearSavedSettings()">Clear Saved Settings</button>
     </div>
-    <h3 style="font-size:0.9rem;margin:16px 0 8px;color:var(--text-dim)">Dealership → Proxy File Mapping</h3>
+    <h3 style="font-size:0.9rem;margin:16px 0 8px;color:var(--text-dim)">Dealership &rarr; Proxy File Mapping</h3>
     <div class="alert-bar alert-info" style="margin-bottom:8px">
-      <span>🔗</span> Map each report dealership name to its proxy file. Set a short name for the output filename.
+      <span>&#128279;</span> Map each report dealership to its proxy file. Store IDs and canonical names are saved in this browser.
     </div>
     <div id="dealershipMap"></div>
   </div>
@@ -132,7 +132,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <div class="card" id="step3">
     <h2><span class="step">3</span> Employee Matching & Review</h2>
     <div class="alert-bar alert-info">
-      <span>ℹ️</span> Review auto-matched employees. Edit names, fix mismatches, and set up redirect rules as needed.
+      <span>&#8505;&#65039;</span> Exact names may auto-match. Nicknames, partial names, and ambiguous matches are flagged for review and can always be changed manually.
     </div>
     <div id="matchArea"></div>
   </div>
@@ -140,22 +140,27 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   <!-- STEP 4: Generate -->
   <div class="card" id="step4">
     <h2><span class="step">4</span> Generate & Download CSVs</h2>
+    <div class="alert-bar alert-info" style="margin-bottom:12px">
+      Chrome may ask for permission to download multiple files. If only one file downloads, click the blocked-download icon at the right of the address bar and choose <strong>Always allow multiple downloads</strong>, then try again.
+    </div>
+    <div id="totalsArea"></div>
     <div id="generateArea">
       <div class="empty-state">Upload files and match employees to generate CSVs</div>
     </div>
   </div>
 
   <footer style="text-align:center;padding:24px;color:var(--text-dim);font-size:0.75rem">
-    Spiff Funding Tool · Settings saved in browser localStorage
+    Spiff Funding Tool &middot; Settings saved in browser localStorage
   </footer>
 
   <script>// ===== STATE =====
 const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 const S={
   report:null,
+  reportFiles:{},
   proxies:{},
   matches:{},
-  config:{month:null,monthYear:null,dateStr:'',aliases:{},shortNames:{},nameOverrides:{},blockedMatches:{},outputNameOverrides:{}},
+  config:{month:null,monthYear:null,dateStr:'',aliases:{},shortNames:{},nameOverrides:{},blockedMatches:{},outputNameOverrides:{},dealerIdsByName:{},dealerNameOverrides:{}},
   redirects:[],
   sort:{},
   activeDealership:null,
@@ -176,6 +181,8 @@ function initConfig(){
   S.config.nameOverrides=loadObj('nameOverrides');
   S.config.blockedMatches=loadObj('blockedMatches');
   S.config.outputNameOverrides=loadObj('outputNameOverrides');
+  S.config.dealerIdsByName=loadObj('dealerIdsByName');
+  S.config.dealerNameOverrides=loadObj('dealerNameOverrides');
   const redirects=load('redirects');
   S.redirects=Array.isArray(redirects)?redirects:[];
   const now=new Date();
@@ -209,7 +216,7 @@ function notifyMatchSummary(saved,reviews,unmatched){
   if(S.lastMatchSummarySig===sig)return;
   S.lastMatchSummarySig=sig;
   if(saved>0)toast(`${saved} employee match(es) loaded from saved overrides`,'info');
-  if(reviews>0)toast(`${reviews} employee(s) need review - last name matched but first name differs`,'warning');
+  if(reviews>0)toast(`${reviews} employee(s) need review because the name is partial, a possible nickname, or ambiguous`,'warning');
   if(unmatched>0)toast(`${unmatched} employee(s) could not be matched`,'error');
 }
 
@@ -232,49 +239,163 @@ function csvCell(v){
   return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s;
 }
 function csvRow(cells){return cells.map(csvCell).join(',')+'\n'}
+function parseAmount(v){
+  const text=String(v??'').replace(/[$,]/g,'').trim();
+  if(!text)return null;
+  const value=Number(text);
+  return Number.isFinite(value)?value:null;
+}
+function addAmount(a,b){return Math.round((Number(a||0)+Number(b||0))*1e10)/1e10}
+function formatAmount(v){
+  const n=Number(v||0);
+  if(!Number.isFinite(n))return'0';
+  return n.toFixed(10).replace(/\.?0+$/,'');
+}
+function formatMoney(v){
+  const raw=formatAmount(v);
+  const parts=raw.split('.');
+  const whole=Number(parts[0]||0).toLocaleString('en-US');
+  return '$'+whole+(parts[1]?'.'+parts[1]:'');
+}
+function headerKey(v){return cellText(v).toLowerCase().replace(/[\s-]+/g,'_')}
+function splitReportName(name){
+  const parts=cellText(name).split(',');
+  return {lastName:cellText(parts[0]),firstName:cellText(parts.slice(1).join(','))};
+}
 function requireSheetJS(){
   if(typeof XLSX==='undefined')throw new Error('The SheetJS parser did not load. Make sure xlsx.full.min.js is in the same folder as this HTML file.');
 }
 
 // ===== PARSE REPORT =====
-function parseReport(data){
+function parseNormalizedReportSheet(rows,sn,fileName,entries,stats,errors){
+  if(rows.length<2)return false;
+  const headers=rows[0].map(headerKey);
+  const role=headers.includes('tech_name')?'Technician':headers.includes('advisor_name')?'Advisor':null;
+  if(!role)return false;
+  const prefix=role==='Technician'?'tech':'advisor';
+  const required=[`${prefix}_name`,`${prefix}_number`,'dealership_id','dealership_name','total_incentive'];
+  const missing=required.filter(key=>!headers.includes(key));
+  if(missing.length)throw new Error(`${fileName}: missing required column(s): ${missing.join(', ')}`);
+  const idx=Object.fromEntries(headers.map((key,i)=>[key,i]));
+  for(let i=1;i<rows.length;i++){
+    const r=rows[i]||[];
+    if(!r.some(v=>cellText(v)))continue;
+    const name=cellText(r[idx[`${prefix}_name`]]);
+    const employeeNumber=cellText(r[idx[`${prefix}_number`]]);
+    const dealershipId=cellText(r[idx.dealership_id]);
+    const rawDealership=cellText(r[idx.dealership_name]);
+    const amount=parseAmount(r[idx.total_incentive]);
+    const missingValues=[];
+    if(!name)missingValues.push(`${prefix}_name`);
+    if(!employeeNumber)missingValues.push(`${prefix}_number`);
+    if(!dealershipId)missingValues.push('dealership_id');
+    if(!rawDealership)missingValues.push('dealership_name');
+    if(missingValues.length){errors.push(`${fileName}, row ${i+1}: blank ${missingValues.join(', ')}`);continue;}
+    if(amount===null){errors.push(`${fileName}, row ${i+1}: invalid total_incentive`);continue;}
+    if(amount<=0){stats.skippedZero++;continue;}
+    const parsedName=splitReportName(name);
+    entries.push({
+      id:`${fileName}:${sn}:${i}:${name}:${dealershipId}:${role}:${employeeNumber}`,
+      name,
+      firstName:parsedName.firstName,
+      lastName:parsedName.lastName,
+      dealership:rawDealership,
+      rawDealership,
+      dealershipId,
+      amount,
+      type:role,
+      techNum:employeeNumber,
+      sourceFile:fileName,
+      sourceSheet:sn,
+      sourceRow:i+1
+    });
+  }
+  stats.normalizedSheets++;
+  return true;
+}
+function parseLegacyReportSheet(rows,sn,fileName,entries,stats){
+  if(rows.length<3)return false;
+  let recognized=false;
+  const type=sn.toLowerCase().includes('tech')?'Technician':'Advisor';
+  for(let i=2;i<rows.length;i++){
+    const r=rows[i]||[];
+    if(r.length<8)continue;
+    const name=cellText(r[1]);
+    const rawDealership=cellText(r[4]);
+    const rawAmount=cellText(r[7]);
+    if(!name||!rawDealership||!rawAmount)continue;
+    const amount=parseAmount(rawAmount);
+    if(amount===null)continue;
+    recognized=true;
+    if(amount<=0){stats.skippedZero++;continue;}
+    const employeeNumber=cellText(r[3]);
+    const parsedName=splitReportName(name);
+    entries.push({
+      id:`${fileName}:${sn}:${i}:${name}:${rawDealership}:${type}:${employeeNumber}`,
+      name,
+      firstName:parsedName.firstName,
+      lastName:parsedName.lastName,
+      dealership:rawDealership,
+      rawDealership,
+      dealershipId:'',
+      amount,
+      type,
+      techNum:employeeNumber,
+      sourceFile:fileName,
+      sourceSheet:sn,
+      sourceRow:i+1
+    });
+  }
+  if(recognized)stats.legacySheets++;
+  return recognized;
+}
+function parseReport(data,fileName='report'){
   requireSheetJS();
   const wb=XLSX.read(data,{type:'array'});
   const entries=[];
+  const errors=[];
+  const stats={normalizedSheets:0,legacySheets:0,skippedZero:0};
   for(const sn of wb.SheetNames){
     const ws=wb.Sheets[sn];
     const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:''});
-    if(rows.length<3)continue;
-    const type=sn.toLowerCase().includes('tech')?'Technician':'Advisor';
-    for(let i=2;i<rows.length;i++){
-      const r=rows[i];
-      if(!r||!r[1])continue;
-      const name=cellText(r[1]);
-      if(!name)continue;
-      const dealership=cellText(r[4]);
-      if(!dealership)continue;
-      let amt=String(r[7]||'0').replace(/[$,]/g,'');
-      amt=parseFloat(amt)||0;
-      if(amt<=0)continue;
-      const parts=name.split(',');
-      const lastName=cellText(parts[0]);
-      const firstName=cellText(parts.slice(1).join(','));
-      entries.push({
-        id:`${sn}:${i}:${name}:${dealership}:${type}:${cellText(r[3])}`,
-        name,
-        firstName,
-        lastName,
-        dealership,
-        amount:Math.round(amt),
-        type,
-        techNum:cellText(r[3]),
-        sourceSheet:sn,
-        sourceRow:i+1
-      });
-    }
+    if(parseNormalizedReportSheet(rows,sn,fileName,entries,stats,errors))continue;
+    parseLegacyReportSheet(rows,sn,fileName,entries,stats);
   }
-  S.report=entries;
-  return entries;
+  if(!stats.normalizedSheets&&!stats.legacySheets){
+    throw new Error(`${fileName}: unsupported report format. Expected a legacy report workbook or a technician/advisor incentive export CSV.`);
+  }
+  if(errors.length){
+    const preview=errors.slice(0,3).join('; ');
+    throw new Error(`${errors.length} invalid report row(s). ${preview}${errors.length>3?'; ...':''}`);
+  }
+  const format=stats.normalizedSheets&&stats.legacySheets?'mixed':stats.normalizedSheets?'incentive export':'legacy';
+  return {entries,format,skippedZero:stats.skippedZero};
+}
+
+function rebuildReport(){
+  const combined=Object.values(S.reportFiles).flatMap(file=>file.entries.map(entry=>({...entry})));
+  const defaultNames={};
+  let learnedIds=false;
+  for(const entry of combined){
+    const raw=entry.rawDealership||entry.dealership;
+    const rawKey=keyNorm(raw);
+    if(!S.config.dealerIdsByName[rawKey]&&entry.dealershipId){
+      S.config.dealerIdsByName[rawKey]=entry.dealershipId;
+      learnedIds=true;
+    }
+    const savedId=S.config.dealerIdsByName[rawKey];
+    entry.dealershipId=cellText(savedId||entry.dealershipId);
+    entry.dealerGroup=entry.dealershipId?`id:${keyNorm(entry.dealershipId)}`:`name:${keyNorm(raw)}`;
+    if(!defaultNames[entry.dealerGroup])defaultNames[entry.dealerGroup]=raw;
+  }
+  for(const entry of combined){
+    entry.dealership=S.config.dealerNameOverrides[entry.dealerGroup]||defaultNames[entry.dealerGroup]||entry.rawDealership;
+  }
+  S.report=combined;
+  S.matches={};
+  S.activeDealership=null;
+  S.lastMatchSummarySig='';
+  if(learnedIds)save('dealerIdsByName',S.config.dealerIdsByName);
 }
 
 // ===== PARSE PROXY =====
@@ -317,32 +438,29 @@ function getDealerships(){
   S.report.forEach(e=>s.add(e.dealership));
   return[...s];
 }
-function getProxyKey(dealership){return S.config.aliases[dealership]||dealership}
-function guessProxyDealership(fileName,reportDealerships){
-  const fn=fileName.toLowerCase().replace(/[_\-.]+/g,' ').replace(/\bxlsx?\b/g,' ');
-  for(const[rn,pn]of Object.entries(S.config.aliases)){
-    if(fn.includes(pn.toLowerCase()))return rn;
-  }
-  for(const rd of reportDealerships){
-    const words=rd.toLowerCase().split(/\s+/);
-    if(words.some(w=>w.length>2&&fn.includes(w)))return rd;
-  }
-  return null;
-}
+function getDealershipEntries(dealership){return(S.report||[]).filter(e=>e.dealership===dealership)}
+function getDealershipId(dealership){return cellText(getDealershipEntries(dealership)[0]?.dealershipId)}
+function getDealershipGroup(dealership){return getDealershipEntries(dealership)[0]?.dealerGroup||`name:${keyNorm(dealership)}`}
+function getDealershipRawNames(dealership){return[...new Set(getDealershipEntries(dealership).map(e=>e.rawDealership||e.dealership))]}
+function getDealershipSetting(settings,dealership){return settings[getDealershipGroup(dealership)]??settings[dealership]}
+function getProxyKey(dealership){return getDealershipSetting(S.config.aliases,dealership)||dealership}
+function getShortName(dealership){return getDealershipSetting(S.config.shortNames,dealership)||dealership.split(/\s+/)[0]}
 function reportPersonKey(re){
   const key=[keyNorm(re.firstName),keyNorm(re.lastName),keyNorm(re.techNum),keyNorm(re.type)].join('|');
   return key.replace(/\|/g,'')?key:keyNorm(re.name);
 }
 function employeeKey(pe){return [keyNorm(pe.proxy),keyNorm(pe.firstName),keyNorm(pe.lastName)].join('|')}
 function proxyKeyId(proxyKey){return keyNorm(proxyKey)||String(proxyKey??'').toLowerCase()}
-function overrideKey(dealership,re){return `${keyNorm(dealership)}::${reportPersonKey(re)}`}
+function dealershipIdentityKey(dealership){return getDealershipGroup(dealership)||dealership}
+function overrideKey(dealership,re){return `${keyNorm(dealershipIdentityKey(dealership))}::${reportPersonKey(re)}`}
 function legacyOverrideKey(dealership,re){return dealership+':'+re.name}
-function blockKey(dealership,re,proxyKey,pe){return `${keyNorm(dealership)}::${reportPersonKey(re)}::${proxyKeyId(proxyKey)}::${employeeKey(pe)}`}
-function matchedPersonId(dealership,pe){return `proxy:${keyNorm(dealership)}:${proxyKeyId(getProxyKey(dealership))}:${employeeKey(pe)}`}
-function reportSourceId(dealership,re){return `report:${keyNorm(dealership)}:${reportPersonKey(re)}`}
-function getRedirectSourceId(dealership,m){return m.proxy?matchedPersonId(dealership,m.proxy):reportSourceId(dealership,m.report)}
-function getRedirectTargetId(dealership,m){return m.proxy?matchedPersonId(dealership,m.proxy):null}
-function getSourceLabel(m){return m.proxy?`${m.proxy.firstName} ${m.proxy.lastName}`:`${m.report.firstName} ${m.report.lastName}`}
+function blockKey(dealership,re,proxyKey,pe){return `${keyNorm(dealershipIdentityKey(dealership))}::${reportPersonKey(re)}::${proxyKeyId(proxyKey)}::${employeeKey(pe)}`}
+function matchedPersonId(dealership,pe){return `proxy:${keyNorm(dealershipIdentityKey(dealership))}:${proxyKeyId(getProxyKey(dealership))}:${employeeKey(pe)}`}
+function reportSourceId(dealership,re){return `report:${keyNorm(dealershipIdentityKey(dealership))}:${reportPersonKey(re)}`}
+function isApprovedMatch(m){return !!m.proxy&&m.status!=='review'}
+function getRedirectSourceId(dealership,m){return isApprovedMatch(m)?matchedPersonId(dealership,m.proxy):reportSourceId(dealership,m.report)}
+function getRedirectTargetId(dealership,m){return isApprovedMatch(m)?matchedPersonId(dealership,m.proxy):null}
+function getSourceLabel(m){return isApprovedMatch(m)?`${m.proxy.firstName} ${m.proxy.lastName}`:`${m.report.firstName} ${m.report.lastName}`}
 function makeNameOverride(proxyKey,pe){return {proxyKey,employeeKey:employeeKey(pe),proxy:pe.proxy,firstName:pe.firstName,lastName:pe.lastName}}
 function findProxyFromOverride(override,proxyList,proxyKey){
   if(!override||typeof override!=='object')return null;
@@ -421,6 +539,33 @@ function makeMatch(dealership,re,pe,idx,status,candidates){
   if(candidates)m.candidates=candidates;
   return applyOutputNameOverride(dealership,m);
 }
+const NICKNAME_GROUPS=[
+  ['ROBERT','BOB','BOBBY','ROB','ROBBIE'],['WILLIAM','BILL','BILLY','WILL','WILLIE'],
+  ['RICHARD','RICK','RICKY','DICK'],['MICHAEL','MIKE','MIKEY'],['JAMES','JIM','JIMMY'],
+  ['JOSEPH','JOE','JOEY'],['THOMAS','TOM','TOMMY'],['JOHN','JACK','JOHNNY'],
+  ['JONATHAN','JON'],['CHRISTOPHER','CHRIS'],['DAVID','DAVE'],['DANIEL','DAN','DANNY'],
+  ['MATTHEW','MATT'],['ANTHONY','TONY'],['CHARLES','CHUCK','CHARLIE'],
+  ['EDWARD','ED','EDDIE','TED'],['DONALD','DON','DONNY'],['RONALD','RON','RONNIE'],
+  ['STEVEN','STEPHEN','STEVE'],['ANDREW','ANDY','DREW'],['ALEXANDER','ALEX'],
+  ['ELIZABETH','BETH','LIZ','LIZZY','BETTY'],['KATHERINE','KATHRYN','KATE','KATIE','KATHY'],
+  ['JENNIFER','JEN','JENNY'],['MARGARET','MAGGIE','PEGGY'],['REBECCA','BECKY'],
+  ['PATRICIA','PAT','PATTY'],['SUSAN','SUE','SUSIE'],['DEBORAH','DEB','DEBBIE']
+];
+function firstCore(name){return norm(cellText(name).split(/\s+/)[0])}
+function nicknameEquivalent(a,b){
+  const aa=firstCore(a),bb=firstCore(b);
+  if(!aa||!bb||aa===bb)return false;
+  return NICKNAME_GROUPS.some(group=>group.includes(aa)&&group.includes(bb));
+}
+function firstNameMatchQuality(reportName,proxyName){
+  const reportFull=norm(reportName),proxyFull=norm(proxyName);
+  const reportCore=firstCore(reportName),proxyCore=firstCore(proxyName);
+  if(reportFull&&reportFull===proxyFull)return 4;
+  if(reportCore&&reportCore===proxyCore)return 3;
+  if(nicknameEquivalent(reportName,proxyName))return 2;
+  if(reportCore.length>=3&&proxyCore.length>=3&&(reportCore.startsWith(proxyCore.substring(0,3))||proxyCore.startsWith(reportCore.substring(0,3))))return 1;
+  return 0;
+}
 function matchEmployees(dealership){
   const reportEntries=S.report.filter(e=>e.dealership===dealership);
   const proxyKey=getProxyKey(dealership);
@@ -435,19 +580,17 @@ function matchEmployees(dealership){
       if(isBlocked(dealership,re,proxyKey,pe))continue;
       if(norm(pe.lastName)===norm(re.lastName))candidates.push({pe,idx:j});
     }
-    if(candidates.length===1){
-      const c=candidates[0];
-      const firstMatch=norm(c.pe.firstName).startsWith(norm(re.firstName).substring(0,3));
-      results.push(makeMatch(dealership,re,c.pe,c.idx,firstMatch?'auto':'review'));
-    }else if(candidates.length>1){
-      let best=null;
-      for(const c of candidates){
-        const rfn=norm(re.firstName);
-        const pfn=norm(c.pe.firstName);
-        if(pfn.startsWith(rfn.substring(0,3))||rfn.startsWith(pfn.substring(0,3))){best=c;break;}
+    if(candidates.length){
+      const scored=candidates.map(c=>({...c,quality:firstNameMatchQuality(re.firstName,c.pe.firstName)}));
+      const bestQuality=Math.max(...scored.map(c=>c.quality));
+      const best=scored.filter(c=>c.quality===bestQuality);
+      if(best.length===1&&bestQuality>=3){
+        results.push(makeMatch(dealership,re,best[0].pe,best[0].idx,'auto',candidates));
+      }else if(best.length===1){
+        results.push(makeMatch(dealership,re,best[0].pe,best[0].idx,'review',candidates));
+      }else{
+        results.push(makeMatch(dealership,re,null,-1,'review',candidates));
       }
-      if(best)results.push(makeMatch(dealership,re,best.pe,best.idx,'auto'));
-      else results.push(makeMatch(dealership,re,null,-1,'unmatched',candidates));
     }else{
       results.push(makeMatch(dealership,re,null,-1,'unmatched'));
     }
@@ -460,18 +603,18 @@ function matchEmployees(dealership){
 function findLegacySourceMatch(matches,rule){
   const ff=norm(rule.fromFirst),fl=norm(rule.fromLast);
   return matches.find(m=>{
-    const src=m.proxy?m.proxy:m.report;
+    const src=isApprovedMatch(m)?m.proxy:m.report;
     return norm(src.firstName)===ff&&norm(src.lastName)===fl;
   })||null;
 }
 function findLegacyTargetMatch(matches,rule){
   const tf=norm(rule.toFirst),tl=norm(rule.toLast);
-  return matches.find(m=>m.proxy&&norm(m.proxy.firstName)===tf&&norm(m.proxy.lastName)===tl)||null;
+  return matches.find(m=>isApprovedMatch(m)&&norm(m.proxy.firstName)===tf&&norm(m.proxy.lastName)===tl)||null;
 }
 function resolveRedirectRule(dealership,matches,rule){
   const fromMatch=rule.fromId?matches.find(m=>getRedirectSourceId(dealership,m)===rule.fromId):findLegacySourceMatch(matches,rule);
-  const toMatch=rule.toId?matches.find(m=>m.proxy&&getRedirectTargetId(dealership,m)===rule.toId):findLegacyTargetMatch(matches,rule);
-  if(!fromMatch||!toMatch||!toMatch.proxy)return null;
+  const toMatch=rule.toId?matches.find(m=>isApprovedMatch(m)&&getRedirectTargetId(dealership,m)===rule.toId):findLegacyTargetMatch(matches,rule);
+  if(!fromMatch||!toMatch||!isApprovedMatch(toMatch))return null;
   const fromId=getRedirectSourceId(dealership,fromMatch);
   const toId=getRedirectTargetId(dealership,toMatch);
   if(!fromId||!toId||fromId===toId)return null;
@@ -483,7 +626,9 @@ function buildRedirectPlan(dealership,matches){
   const targetIds=new Set();
   let skipped=0;
   for(const rule of S.redirects){
-    if(rule.dealership!==dealership)continue;
+    if(rule.dealershipKey){
+      if(rule.dealershipKey!==dealershipIdentityKey(dealership))continue;
+    }else if(rule.dealership!==dealership)continue;
     const resolved=resolveRedirectRule(dealership,matches,rule);
     if(!resolved){skipped++;continue;}
     if(sourceIds.has(resolved.fromId)||sourceIds.has(resolved.toId)||targetIds.has(resolved.fromId)){
@@ -503,14 +648,14 @@ function buildCsvState(dealership,matchesOverride){
   const sourceLabels={};
   for(const m of matches){
     const sourceId=getRedirectSourceId(dealership,m);
-    sourceAmounts[sourceId]=(sourceAmounts[sourceId]||0)+m.report.amount;
+    sourceAmounts[sourceId]=addAmount(sourceAmounts[sourceId]||0,m.report.amount);
     sourceLabels[sourceId]=getSourceLabel(m);
-    if(!m.proxy)continue;
+    if(!isApprovedMatch(m))continue;
     const rowId=getRedirectTargetId(dealership,m);
     if(!rows[rowId]){
       rows[rowId]={id:rowId,proxy:m.proxy.proxy,firstName:m.outFirst,lastName:m.outLast,amount:0};
     }
-    rows[rowId].amount+=m.report.amount;
+    rows[rowId].amount=addAmount(rows[rowId].amount,m.report.amount);
   }
   const redirectPlan=buildRedirectPlan(dealership,matches);
   const bonusesByToId={};
@@ -518,7 +663,7 @@ function buildCsvState(dealership,matchesOverride){
     const amount=sourceAmounts[rule.fromId]||0;
     if(amount<=0)continue;
     if(rows[rule.toId]){
-      rows[rule.toId].amount+=amount;
+      rows[rule.toId].amount=addAmount(rows[rule.toId].amount,amount);
       if(!bonusesByToId[rule.toId])bonusesByToId[rule.toId]=[];
       bonusesByToId[rule.toId].push({amount,label:sourceLabels[rule.fromId]||rule.fromLabel});
     }
@@ -534,12 +679,12 @@ function generateCSV(dealership){
   if(!sorted.length)return null;
   let csv=csvRow(['proxy','amount','firstName','lastName','comment','other']);
   for(const a of sorted){
-    csv+=csvRow([a.proxy,a.amount,a.firstName,a.lastName,'','']);
+    csv+=csvRow([a.proxy,formatAmount(a.amount),a.firstName,a.lastName,'','']);
   }
   return csv;
 }
 function getFileName(dealership){
-  const sn=S.config.shortNames[dealership]||dealership.split(/\s+/)[0];
+  const sn=getShortName(dealership);
   const mn=fmtMonth(S.config.month);
   return `${sn}_${mn}_Spiff_Funding_${S.config.dateStr}.csv`;
 }
@@ -549,6 +694,7 @@ function renderAll(){
   renderConfig();
   renderDealershipMap();
   renderMatches();
+  renderTotals();
   renderGenerate();
 }
 function renderConfig(){
@@ -570,10 +716,16 @@ function renderDealershipMap(){
   const proxyKeys=Object.keys(S.proxies);
   let html='';
   for(const d of dealerships){
-    const mapped=S.config.aliases[d]||'';
-    const shortName=S.config.shortNames[d]||d.split(/\s+/)[0];
+    const mapped=getDealershipSetting(S.config.aliases,d)||'';
+    const shortName=getShortName(d);
+    const dealershipId=getDealershipId(d);
+    const rawNames=getDealershipRawNames(d);
     html+=`<div class="mapping-row">
-      <div><strong>${h(d)}</strong></div>
+      <div>
+        <input type="text" value="${h(d)}" aria-label="Canonical store name for ${h(d)}" title="Canonical store name" style="width:100%;font-weight:700;margin-bottom:4px" onchange="setCanonicalDealershipName(${jsArg(d)},this.value)">
+        <div style="display:flex;align-items:center;gap:6px;color:var(--text-dim);font-size:0.72rem"><span>Store ID:</span><input type="text" value="${h(dealershipId)}" aria-label="Store ID for ${h(d)}" placeholder="Optional" style="width:80px;padding:4px 6px" onchange="setDealershipId(${jsArg(d)},this.value)"></div>
+        ${rawNames.length>1?`<div style="color:var(--text-dim);font-size:0.68rem;margin-top:3px">Combined names: ${rawNames.map(h).join(' / ')}</div>`:''}
+      </div>
       <div class="mapping-arrow">&rarr;</div>
       <select onchange="setAlias(${jsArg(d)},this.value)" class="match-select">
         <option value="">-- Select Proxy File --</option>
@@ -587,7 +739,7 @@ function renderDealershipMap(){
 function renderMatches(){
   const container=document.getElementById('matchArea');
   const dealerships=getDealerships();
-  if(!dealerships.length||!Object.keys(S.proxies).length){container.innerHTML='';S.activeDealership=null;return;}
+  if(!dealerships.length||!Object.keys(S.proxies).length){container.innerHTML='';S.matches={};S.activeDealership=null;return;}
   for(const d of dealerships)matchEmployees(d);
   let activeIdx=dealerships.indexOf(S.activeDealership);
   if(activeIdx<0)activeIdx=0;
@@ -630,7 +782,7 @@ function uniqueMatches(matches,predicate,idFn){
 }
 function renderRedirectSection(dealership){
   const matches=S.matches[dealership]||[];
-  const matched=matches.filter(m=>m.proxy);
+  const matched=matches.filter(isApprovedMatch);
   if(!matched.length)return'';
   const state=buildCsvState(dealership,matches);
   const plan=state.redirectPlan;
@@ -647,19 +799,19 @@ function renderRedirectSection(dealership){
     html+=`<div class="alert-bar alert-warning" style="margin-top:8px">${plan.skipped} stale or conflicting redirect rule(s) skipped. <button class="btn btn-danger btn-sm" onclick="cleanupRedirects(${jsArg(dealership)})">Clean Up</button></div>`;
   }
   let fromOpts='';
-  const unmatched=uniqueMatches(matches,m=>!m.proxy,m=>getRedirectSourceId(dealership,m));
+  const unmatched=uniqueMatches(matches,m=>!isApprovedMatch(m),m=>getRedirectSourceId(dealership,m));
   if(unmatched.length){
     fromOpts+=`<optgroup label="Unmatched (report only)">${unmatched.map(m=>{
       const id=getRedirectSourceId(dealership,m);
       return `<option value="${h(id)}">${h(getSourceLabel(m))} ($${state.sourceAmounts[id]||0})</option>`;
     }).join('')}</optgroup>`;
   }
-  const matchedSources=uniqueMatches(matches,m=>!!m.proxy,m=>getRedirectSourceId(dealership,m));
+  const matchedSources=uniqueMatches(matches,isApprovedMatch,m=>getRedirectSourceId(dealership,m));
   fromOpts+=`<optgroup label="Matched">${matchedSources.map(m=>{
     const id=getRedirectSourceId(dealership,m);
     return `<option value="${h(id)}">${h(getSourceLabel(m))} ($${state.sourceAmounts[id]||0})</option>`;
   }).join('')}</optgroup>`;
-  const targets=uniqueMatches(matches,m=>!!m.proxy,m=>getRedirectTargetId(dealership,m));
+  const targets=uniqueMatches(matches,isApprovedMatch,m=>getRedirectTargetId(dealership,m));
   const toOpts=targets.map(m=>`<option value="${h(getRedirectTargetId(dealership,m))}">${h(getSourceLabel(m))}</option>`).join('');
   html+=`<div class="redirect-add"><label style="font-size:0.8rem;color:var(--text-dim);min-width:auto">From:</label><select id="${h(fromElId)}">${fromOpts}</select><span class="arrow" style="color:var(--accent);font-weight:700">&rarr;</span><label style="font-size:0.8rem;color:var(--text-dim);min-width:auto">To:</label><select id="${h(toElId)}">${toOpts}</select><button class="btn btn-secondary btn-sm" onclick="addRedirectForDealer(${jsArg(dealership)},${jsArg(fromElId)},${jsArg(toElId)})">Add</button></div></div>`;
   return html;
@@ -669,7 +821,7 @@ function sortMatchesFor(dealership,col){
   if(cur&&cur.col===col)S.sort[dealership]={col,dir:cur.dir==='asc'?'desc':'asc'};
   else S.sort[dealership]={col,dir:'asc'};
   S.activeDealership=dealership;
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
 }
 function renderMatchTable(dealership){
   const matches=S.matches[dealership]||[];
@@ -715,25 +867,25 @@ function renderMatchTable(dealership){
     const proxyDisplay=m.proxy?`${m.proxy.firstName} ${m.proxy.lastName}`:'-';
     const proxyNum=m.proxy?m.proxy.proxy:'-';
     let redirNote='';
-    let amtDisplay=`$${m.report.amount}`;
+    let amtDisplay=formatMoney(m.report.amount);
     if(isRedirFrom){
-      amtDisplay=`<s style="color:var(--text-dim)">$${m.report.amount}</s>`;
+      amtDisplay=`<s style="color:var(--text-dim)">${formatMoney(m.report.amount)}</s>`;
     }else if(redirTo.length&&targetId&&state.rows[targetId]){
       const total=state.rows[targetId].amount;
-      const parts=redirTo.map(r=>`received $${r.amount} from ${h(r.label)}`);
-      amtDisplay=`<strong style="color:var(--success)">$${total}</strong>`;
+      const parts=redirTo.map(r=>`received ${formatMoney(r.amount)} from ${h(r.label)}`);
+      amtDisplay=`<strong style="color:var(--success)">${formatMoney(total)}</strong>`;
       redirNote=`<div style="font-size:0.7rem;color:var(--accent);margin-top:2px">${parts.join('<br>')}</div>`;
     }
     let matchedCol;
     const proxyOptions=proxyList.map((p,j)=>`<option value="${j}" ${j===m.proxyIdx?'selected':''}>${h(p.firstName)} ${h(p.lastName)}</option>`).join('');
     if(isRedirFrom){matchedCol='-';}
-    else if(m.status==='review'){
-      matchedCol=`<div style="margin-bottom:4px">${h(proxyDisplay)}</div><select class="match-select" onchange="manualMatch(${jsArg(dealership)},${i},this.value)" style="font-size:0.75rem"><option value="-1">Change match...</option>${proxyOptions}</select>`;
-    }else if(m.proxy){matchedCol=h(proxyDisplay);}
-    else{matchedCol=`<select class="match-select" onchange="manualMatch(${jsArg(dealership)},${i},this.value)"><option value="-1">-- Select --</option>${proxyOptions}</select>`;}
+    else{
+      const prompt=m.proxy?'Change match...':'-- Select --';
+      matchedCol=`${m.proxy?`<div style="margin-bottom:4px">${h(proxyDisplay)}</div>`:''}<select class="match-select" onchange="manualMatch(${jsArg(dealership)},${i},this.value)" style="font-size:0.75rem"><option value="-1">${prompt}</option>${proxyOptions}</select>`;
+    }
     let actionsCol='';
     if(!isRedirFrom){
-      if(m.status==='review')actionsCol=`<button class="btn btn-success btn-sm" onclick="confirmMatch(${jsArg(dealership)},${i})" title="Confirm match">Confirm</button> <button class="btn btn-secondary btn-sm" onclick="clearMatch(${jsArg(dealership)},${i})" title="Unmatch">Unmatch</button>`;
+      if(m.status==='review'&&m.proxy)actionsCol=`<button class="btn btn-success btn-sm" onclick="confirmMatch(${jsArg(dealership)},${i})" title="Confirm match">Confirm</button> <button class="btn btn-secondary btn-sm" onclick="clearMatch(${jsArg(dealership)},${i})" title="Unmatch">Unmatch</button>`;
       else if(m.proxy)actionsCol=`<button class="btn btn-secondary btn-sm" onclick="clearMatch(${jsArg(dealership)},${i})">Unmatch</button>`;
     }
     html+=`<tr style="${rowStyle}">
@@ -751,6 +903,38 @@ function renderMatchTable(dealership){
   html+='</tbody></table>';
   return html;
 }
+function getStoreTotals(dealership){
+  let matches=S.matches[dealership];
+  if(!matches){
+    matches=S.report.filter(e=>e.dealership===dealership).map(re=>({report:re,proxy:null,status:'unmatched',outFirst:re.firstName,outLast:re.lastName}));
+  }
+  const state=buildCsvState(dealership,matches);
+  const owed=Object.values(state.rows).filter(row=>row.amount>0).reduce((sum,row)=>addAmount(sum,row.amount),0);
+  let unmatched=0;
+  let reportTotal=0;
+  for(const m of matches){
+    reportTotal=addAmount(reportTotal,m.report.amount);
+    const sourceId=getRedirectSourceId(dealership,m);
+    if(!isApprovedMatch(m)&&!state.redirectSources.has(sourceId))unmatched=addAmount(unmatched,m.report.amount);
+  }
+  return {owed,unmatched,reportTotal};
+}
+function renderTotals(){
+  const container=document.getElementById('totalsArea');
+  if(!container)return;
+  const dealerships=getDealerships();
+  if(!dealerships.length){container.innerHTML='';return;}
+  let grandOwed=0,grandUnmatched=0,grandReport=0;
+  let rows='';
+  for(const dealership of dealerships){
+    const totals=getStoreTotals(dealership);
+    grandOwed=addAmount(grandOwed,totals.owed);
+    grandUnmatched=addAmount(grandUnmatched,totals.unmatched);
+    grandReport=addAmount(grandReport,totals.reportTotal);
+    rows+=`<tr><td><strong>${h(dealership)}</strong></td><td style="color:var(--success);font-weight:700">${formatMoney(totals.owed)}</td><td style="color:${totals.unmatched?'var(--warning)':'var(--text-dim)'};font-weight:700">${formatMoney(totals.unmatched)}</td><td>${formatMoney(totals.reportTotal)}</td></tr>`;
+  }
+  container.innerHTML=`<h3 style="font-size:0.95rem;margin:0 0 8px">Funding Totals</h3><table style="margin-bottom:16px"><thead><tr><th>Store</th><th>Owed (proxy matched)</th><th>Unmatched</th><th>Total report</th></tr></thead><tbody>${rows}<tr><td><strong>All Stores</strong></td><td style="color:var(--success);font-weight:800">${formatMoney(grandOwed)}</td><td style="color:${grandUnmatched?'var(--warning)':'var(--text-dim)'};font-weight:800">${formatMoney(grandUnmatched)}</td><td><strong>${formatMoney(grandReport)}</strong></td></tr></tbody></table>`;
+}
 function renderGenerate(){
   const container=document.getElementById('generateArea');
   const dealerships=getDealerships();
@@ -766,7 +950,7 @@ function renderGenerate(){
     const count=Object.values(state.rows).filter(a=>a.amount>0).length;
     if(!count)continue;
     const fn=getFileName(d);
-    html+=`<div class="dl-card"><div><div class="name">${h(d)}</div><div class="info">${h(fn)} · ${count} entries</div></div><div class="dl-actions"><button class="btn btn-secondary btn-sm" onclick="previewCSV(${jsArg(d)})">Preview</button><button class="btn btn-primary btn-sm" onclick="downloadOne(${jsArg(d)})">Download</button></div></div>`;
+    html+=`<div class="dl-card"><div><div class="name">${h(d)}</div><div class="info">${h(fn)} &middot; ${count} entries &middot; ${formatMoney(getStoreTotals(d).owed)}</div></div><div class="dl-actions"><button class="btn btn-secondary btn-sm" onclick="previewCSV(${jsArg(d)})">Preview</button><button class="btn btn-primary btn-sm" onclick="downloadOne(${jsArg(d)})">Download</button></div></div>`;
   }
   html+='</div><div id="csvPreview"></div>';
   container.innerHTML=html;
@@ -779,16 +963,61 @@ function showDealerTab(idx,d){
   document.querySelectorAll('.dealer-panel').forEach((p,i)=>p.classList.toggle('hidden',i!==idx));
 }
 function setAlias(reportName,proxyKey){
-  if(proxyKey)S.config.aliases[reportName]=proxyKey;
-  else delete S.config.aliases[reportName];
+  const key=getDealershipGroup(reportName);
+  if(proxyKey)S.config.aliases[key]=proxyKey;
+  else delete S.config.aliases[key];
+  delete S.config.aliases[reportName];
   save('aliases',S.config.aliases);
   S.activeDealership=reportName;
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
 }
 function setShortName(dealership,name){
-  S.config.shortNames[dealership]=name;
+  S.config.shortNames[getDealershipGroup(dealership)]=name;
+  delete S.config.shortNames[dealership];
   save('shortNames',S.config.shortNames);
   renderGenerate();
+}
+function moveDealershipSettings(oldName,newName){
+  if(oldName===newName)return;
+  for(const key of ['aliases','shortNames']){
+    if(S.config[key][oldName]!==undefined&&S.config[key][newName]===undefined)S.config[key][newName]=S.config[key][oldName];
+    delete S.config[key][oldName];
+    save(key,S.config[key]);
+  }
+  let redirectsChanged=false;
+  for(const rule of S.redirects){
+    if(rule.dealership===oldName){rule.dealership=newName;redirectsChanged=true;}
+  }
+  if(redirectsChanged)save('redirects',S.redirects);
+}
+function setCanonicalDealershipName(dealership,name){
+  name=cellText(name);
+  if(!name){toast('Store name cannot be blank','warning');renderDealershipMap();return;}
+  const group=getDealershipGroup(dealership);
+  S.config.dealerNameOverrides[group]=name;
+  save('dealerNameOverrides',S.config.dealerNameOverrides);
+  moveDealershipSettings(dealership,name);
+  rebuildReport();
+  renderAll();
+  toast(`Store name saved as ${name}`,'success');
+}
+function setDealershipId(dealership,id){
+  id=cellText(id);
+  const entries=getDealershipEntries(dealership);
+  const oldGroup=getDealershipGroup(dealership);
+  for(const raw of [...new Set(entries.map(e=>e.rawDealership||e.dealership))]){
+    if(id)S.config.dealerIdsByName[keyNorm(raw)]=id;
+    else delete S.config.dealerIdsByName[keyNorm(raw)];
+  }
+  const newGroup=id?`id:${keyNorm(id)}`:`name:${keyNorm(entries[0]?.rawDealership||dealership)}`;
+  if(S.config.dealerNameOverrides[oldGroup]&&!S.config.dealerNameOverrides[newGroup]){
+    S.config.dealerNameOverrides[newGroup]=S.config.dealerNameOverrides[oldGroup];
+  }
+  save('dealerIdsByName',S.config.dealerIdsByName);
+  save('dealerNameOverrides',S.config.dealerNameOverrides);
+  rebuildReport();
+  renderAll();
+  toast(id?`Store ID ${id} saved for ${dealership}`:`Saved Store ID cleared for ${dealership}`,'success');
 }
 function confirmMatch(dealership,matchIdx){
   const m=S.matches[dealership][matchIdx];
@@ -798,7 +1027,7 @@ function confirmMatch(dealership,matchIdx){
   saveNameOverride(dealership,m.report,proxyKey,m.proxy);
   clearBlockedMatch(dealership,m.report,proxyKey,m.proxy);
   toast(`Confirmed match: ${m.report.name} -> ${m.proxy.firstName} ${m.proxy.lastName}`,'success');
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
 }
 function manualMatch(dealership,matchIdx,proxyIdx){
   proxyIdx=parseInt(proxyIdx,10);
@@ -817,7 +1046,7 @@ function manualMatch(dealership,matchIdx,proxyIdx){
     clearBlockedMatch(dealership,m.report,proxyKey,m.proxy);
     toast(`Saved match: ${m.report.name} -> ${m.proxy.firstName} ${m.proxy.lastName}`,'success');
   }
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
 }
 function editName(dealership,matchIdx,field,value){
   const m=S.matches[dealership][matchIdx];
@@ -834,13 +1063,13 @@ function clearMatch(dealership,matchIdx){
   if(m.proxy)blockMatch(dealership,m.report,proxyKey,m.proxy);
   deleteNameOverride(dealership,m.report);
   toast(`Unmatched ${m.report.name}`,'info');
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
 }
 function removeRedirect(idx){
   if(idx<0)return;
   S.redirects.splice(idx,1);
   save('redirects',S.redirects);
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
 }
 function cleanupRedirects(dealership){
   const matches=S.matches[dealership]||[];
@@ -849,7 +1078,7 @@ function cleanupRedirects(dealership){
   const before=S.redirects.length;
   S.redirects=S.redirects.filter(r=>r.dealership!==dealership||valid.has(r));
   save('redirects',S.redirects);
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
   toast(`Removed ${before-S.redirects.length} skipped redirect rule(s)`,'success');
 }
 function addRedirectForDealer(dealership,fromElId,toElId){
@@ -862,15 +1091,16 @@ function addRedirectForDealer(dealership,fromElId,toElId){
   if(fromId===toId){toast('From and To cannot be the same person','warning');return;}
   const matches=S.matches[dealership]||[];
   const fromMatch=matches.find(m=>getRedirectSourceId(dealership,m)===fromId);
-  const toMatch=matches.find(m=>m.proxy&&getRedirectTargetId(dealership,m)===toId);
+  const toMatch=matches.find(m=>isApprovedMatch(m)&&getRedirectTargetId(dealership,m)===toId);
   if(!fromMatch||!toMatch){toast('Selected redirect employees are no longer available','warning');return;}
   const plan=buildRedirectPlan(dealership,matches);
   if(plan.sourceIds.has(fromId)){toast('That employee is already redirected','warning');return;}
   if(plan.sourceIds.has(toId)){toast('That target already redirects to someone else','warning');return;}
   if(plan.targetIds.has(fromId)){toast('That source already receives redirected funds','warning');return;}
-  const fromPerson=fromMatch.proxy?fromMatch.proxy:fromMatch.report;
+  const fromPerson=isApprovedMatch(fromMatch)?fromMatch.proxy:fromMatch.report;
   S.redirects.push({
     dealership,
+    dealershipKey:dealershipIdentityKey(dealership),
     fromId,
     toId,
     fromFirst:fromPerson.firstName,
@@ -879,7 +1109,7 @@ function addRedirectForDealer(dealership,fromElId,toElId){
     toLast:toMatch.proxy.lastName
   });
   save('redirects',S.redirects);
-  renderMatches();renderGenerate();
+  renderMatches();renderTotals();renderGenerate();
   toast('Redirect rule added','success');
 }
 function previewCSV(dealership){
@@ -912,62 +1142,92 @@ function generateAll(){
     setTimeout(()=>URL.revokeObjectURL(a.href),0);
     count++;
   }
-  toast(count?`Generated ${count} CSV file(s)`:'No CSV files were generated',count?'success':'warning');
+  toast(count?`Started ${count} CSV download(s). If Chrome downloads only one, allow multiple downloads from the icon at the right of the address bar and try again.`:'No CSV files were generated',count?'success':'warning');
 }
 function clearSavedSettings(){
-  if(!confirm('Clear saved dealership mappings, match overrides, blocked matches, edited names, and redirects?'))return;
-  ['aliases','shortNames','nameOverrides','blockedMatches','outputNameOverrides','redirects'].forEach(removeSaved);
+  if(!confirm('Clear saved dealership IDs/names, proxy mappings, match overrides, blocked matches, edited names, and redirects?'))return;
+  ['aliases','shortNames','nameOverrides','blockedMatches','outputNameOverrides','dealerIdsByName','dealerNameOverrides','redirects'].forEach(removeSaved);
   S.config.aliases={};
   S.config.shortNames={};
   S.config.nameOverrides={};
   S.config.blockedMatches={};
   S.config.outputNameOverrides={};
+  S.config.dealerIdsByName={};
+  S.config.dealerNameOverrides={};
   S.redirects=[];
   S.lastMatchSummarySig='';
+  if(Object.keys(S.reportFiles).length)rebuildReport();
   renderAll();
   toast('Saved settings cleared','success');
 }
 
 // ===== FILE HANDLING =====
-function handleReport(file){
-  const reader=new FileReader();
-  reader.onload=function(e){
-    try{
-      const data=new Uint8Array(e.target.result);
-      const entries=parseReport(data);
-      document.getElementById('reportTag').innerHTML=`<div class="file-tag">${h(file.name)} (${entries.length} entries with spiffs) <span class="remove" onclick="clearReport()">x</span></div>`;
-      S.lastMatchSummarySig='';
-      toast(`Report loaded: ${entries.length} entries with spiffs > $0`,'success');
-      tryAutoMap();
-      renderAll();
-    }catch(err){
-      toast(`Could not read ${file.name}: ${err.message||err}`,'error');
-    }
-  };
-  reader.onerror=function(){toast(`Could not read ${file.name}`,'error')};
-  reader.readAsArrayBuffer(file);
+function readFileData(file){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onload=e=>resolve(new Uint8Array(e.target.result));
+    reader.onerror=()=>reject(new Error(`Could not read ${file.name}`));
+    reader.readAsArrayBuffer(file);
+  });
 }
-function handleProxy(file){
-  const reader=new FileReader();
-  reader.onload=function(e){
+function reportFileKey(file){return file.name.toLowerCase()}
+async function handleReportFiles(files){
+  files=[...files];
+  if(!files.length)return;
+  const results=await Promise.all(files.map(async file=>{
     try{
-      const data=new Uint8Array(e.target.result);
+      const data=await readFileData(file);
+      return {ok:true,file,result:parseReport(data,file.name)};
+    }catch(error){return {ok:false,file,error};}
+  }));
+  const failures=results.filter(r=>!r.ok);
+  if(failures.length){
+    failures.forEach(r=>toast(`Could not load ${r.file.name}: ${r.error.message||r.error}`,'error'));
+    toast('No report files from this batch were added. Fix the errors and try the batch again.','warning');
+    return;
+  }
+  for(const {file,result} of results){
+    S.reportFiles[reportFileKey(file)]={name:file.name,entries:result.entries,format:result.format,skippedZero:result.skippedZero};
+  }
+  rebuildReport();
+  renderReportTags();
+  tryAutoMap();
+  renderAll();
+  const skipped=results.reduce((sum,r)=>sum+r.result.skippedZero,0);
+  const message=`Loaded ${results.length} report file(s): ${S.report.length} positive spiff entries${skipped?`; ${skipped} zero/non-positive row(s) skipped`:''}`;
+  toast(message,S.report.length?'success':'warning');
+}
+function proxyFileKey(file){
+  let key=file.name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/_proxy_numbers/i,'').replace(/proxy\s*numbers?/i,'').replace(/cards?\s*/i,'').trim();
+  return key||file.name;
+}
+async function handleProxyFiles(files){
+  files=[...files];
+  if(!files.length)return;
+  const results=await Promise.all(files.map(async file=>{
+    try{
+      const data=await readFileData(file);
       const employees=parseProxy(data,file.name);
-      if(!employees.length){toast(`No proxy data found in ${file.name}`,'warning');return;}
-      let key=file.name.replace(/\.(xlsx|xls|csv)$/i,'').replace(/_proxy_numbers/i,'').replace(/proxy\s*numbers?/i,'').replace(/cards?\s*/i,'').trim();
-      key=key||file.name;
-      S.proxies[key]=employees;
-      renderProxyTags();
-      S.lastMatchSummarySig='';
-      toast(`Loaded ${employees.length} employees from ${file.name}`,'success');
-      tryAutoMap();
-      renderAll();
-    }catch(err){
-      toast(`Could not read ${file.name}: ${err.message||err}`,'error');
-    }
-  };
-  reader.onerror=function(){toast(`Could not read ${file.name}`,'error')};
-  reader.readAsArrayBuffer(file);
+      if(!employees.length)throw new Error('No proxy columns or employee rows were found');
+      return {ok:true,file,key:proxyFileKey(file),employees};
+    }catch(error){return {ok:false,file,error};}
+  }));
+  const failures=results.filter(r=>!r.ok);
+  if(failures.length){
+    failures.forEach(r=>toast(`Could not load ${r.file.name}: ${r.error.message||r.error}`,'error'));
+    toast('No proxy files from this batch were added. Fix the errors and try the batch again.','warning');
+    return;
+  }
+  for(const result of results)S.proxies[result.key]=result.employees;
+  renderProxyTags();
+  S.lastMatchSummarySig='';
+  tryAutoMap();
+  renderAll();
+  toast(`Loaded ${results.length} proxy file(s) with ${results.reduce((sum,r)=>sum+r.employees.length,0)} employees`,'success');
+}
+const DEALER_MATCH_STOP_WORDS=new Set(['chrysler','dodge','jeep','ram','ford','chevrolet','chevy','buick','gmc','cadillac','toyota','honda','nissan','kia','hyundai','mazda','subaru','volkswagen','automall','auto','motors','motor','dealership','dealer','proxy','proxies','number','numbers','card','cards','file']);
+function dealershipMatchTokens(value){
+  return String(value??'').toLowerCase().replace(/\.(xlsx?|csv)$/g,' ').replace(/[^a-z0-9]+/g,' ').split(/\s+/).filter(word=>word.length>2&&!DEALER_MATCH_STOP_WORDS.has(word));
 }
 function tryAutoMap(){
   if(!S.report)return;
@@ -975,25 +1235,40 @@ function tryAutoMap(){
   const proxyKeys=Object.keys(S.proxies);
   let changed=false;
   for(const d of dealerships){
-    if(S.config.aliases[d])continue;
-    for(const pk of proxyKeys){
-      const dw=d.toLowerCase().split(/\s+/);
-      const pw=pk.toLowerCase().split(/\s+/);
-      if(dw.some(w=>w.length>2&&pw.some(p=>p.includes(w)))||pw.some(w=>w.length>2&&dw.some(p=>p.includes(w)))){
-        S.config.aliases[d]=pk;
-        changed=true;
-        break;
-      }
+    const settingKey=getDealershipGroup(d);
+    if(getDealershipSetting(S.config.aliases,d))continue;
+    const dealerTokens=dealershipMatchTokens(d);
+    const scored=proxyKeys.map(pk=>{
+      const proxyTokens=dealershipMatchTokens(pk);
+      const shared=dealerTokens.filter(token=>proxyTokens.includes(token)).length;
+      const exact=keyNorm(d)===keyNorm(pk)?100:0;
+      return {pk,score:exact+shared};
+    }).filter(item=>item.score>0).sort((a,b)=>b.score-a.score);
+    if(scored.length&&(!scored[1]||scored[0].score>scored[1].score)){
+      S.config.aliases[settingKey]=scored[0].pk;
+      changed=true;
     }
   }
-  if(changed)save('aliases',S.config.aliases);
+  if(changed){save('aliases',S.config.aliases);toast('Unique store names were auto-mapped. Review the mapping dropdowns before generating files.','info');}
 }
 function clearReport(){
+  S.reportFiles={};
   S.report=null;
   S.matches={};
   S.activeDealership=null;
   S.lastMatchSummarySig='';
   document.getElementById('reportTag').innerHTML='';
+  renderAll();
+}
+function renderReportTags(){
+  const c=document.getElementById('reportTag');
+  c.innerHTML=Object.entries(S.reportFiles).map(([key,file])=>`<div class="file-tag">${h(file.name)} (${file.entries.length}, ${h(file.format)}) <span class="remove" onclick="removeReportFile(${jsArg(key)})">x</span></div>`).join('');
+}
+function removeReportFile(key){
+  delete S.reportFiles[key];
+  rebuildReport();
+  if(!S.report.length)S.report=null;
+  renderReportTags();
   renderAll();
 }
 function renderProxyTags(){
@@ -1024,14 +1299,14 @@ function init(){
     el.addEventListener('drop',e=>{
       e.preventDefault();el.classList.remove('drag-over');
       const files=[...e.dataTransfer.files];
-      files.forEach(f=>{if(id==='reportDrop')handleReport(f);else handleProxy(f);});
+      if(id==='reportDrop')handleReportFiles(files);else handleProxyFiles(files);
     });
     el.addEventListener('click',()=>{
       const inp=document.createElement('input');
       inp.type='file';
       inp.accept='.xlsx,.xls,.csv';
-      if(id==='proxyDrop')inp.multiple=true;
-      inp.onchange=()=>[...inp.files].forEach(f=>{if(id==='reportDrop')handleReport(f);else handleProxy(f);});
+      inp.multiple=true;
+      inp.onchange=()=>{if(id==='reportDrop')handleReportFiles(inp.files);else handleProxyFiles(inp.files);};
       inp.click();
     });
   });
